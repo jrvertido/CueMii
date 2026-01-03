@@ -5,11 +5,10 @@ import { VALID_GENDERS, SKILL_LEVELS } from '../data/initialData';
  * @param {Array} players - Array of player objects
  */
 export const exportPlayersToCSV = (players) => {
-  const headers = ['id', 'name', 'gender', 'level'];
+  const headers = ['name', 'gender', 'level'];
   const csvContent = [
     headers.join(','),
     ...players.map(p => [
-      p.id,
       `"${p.name.replace(/"/g, '""')}"`, // Escape quotes in names
       p.gender,
       p.level
@@ -75,6 +74,9 @@ export const parsePlayersCSV = (text) => {
     return { players: [], errors: ['CSV must have a "name" column'] };
   }
 
+  // Generate unique base ID for this import batch
+  const baseId = Date.now();
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) continue;
@@ -97,8 +99,9 @@ export const parsePlayersCSV = (text) => {
     const matchedLevel = SKILL_LEVELS.find(l => l.toLowerCase() === level.toLowerCase());
     level = matchedLevel || 'Intermediate';
 
+    // Generate unique ID using base timestamp + index
     players.push({
-      id: Date.now() + Math.random(),
+      id: baseId + i,
       name,
       gender,
       level

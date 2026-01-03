@@ -1,5 +1,7 @@
 # BADDIXX CueMii App
 
+**Version 1.1.4**
+
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
 **Created by Joseph Vertido**
@@ -96,32 +98,27 @@ baddixx-app/
 The Smart Match feature selects players with the following priority:
 
 1. **Longest Idle Time**: Players waiting longest are prioritized first
-2. **Expert Exclusivity**: Expert players can ONLY be grouped with other Expert players
-3. **Mixed Skill Levels**: For non-Expert matches, the algorithm prefers mixing Advanced, Intermediate, and Novice players together
-4. **Gender Balance**: Tries to create balanced groups with equal male and female players (e.g., 2M + 2F)
-5. **Skill Level Balance**: Uses smart selection to ensure an even distribution of skill levels
-6. **Incomplete Expert Matches**: If there aren't enough Expert players available, the remaining slots are left empty
+2. **Expert Male Exclusivity**: Expert male players can ONLY be grouped with other Expert male players
+3. **Expert Female Exclusivity**: Expert female players can ONLY be grouped with other Expert female players
+4. **Mixed Skill Levels**: For non-Expert matches, the algorithm prefers mixing Advanced, Intermediate, and Novice players together
+5. **Gender Mode (50/50)**: Half the time matches are single-gender (all male or all female), half the time mixed
+6. **Gender Balance in Mixed**: When mixed gender, prefers even split (2 male + 2 female)
+7. **Skill Level Balance**: Even distribution across skill levels
+8. **Leave Empty for Experts**: If not enough Expert players of the same gender available, slots stay empty
 
 ### How it works:
 
-The algorithm evaluates each available player and calculates a "balance score" based on:
-- How underrepresented their gender is in the current match
-- How underrepresented their skill level is in the current match  
-- How long they've been waiting
-
-Players who would best balance the group are selected first.
+- **Expert matches**: Determined by longest-waiting player or existing players. Expert males only with expert males, expert females only with expert females.
+- **Non-expert matches**: Uses match ID to determine gender mode (even ID = mixed, odd ID = single-gender)
+- **Mixed gender**: Alternates picks to achieve 2M+2F balance
+- **Single gender**: Picks from the same gender as the longest-waiting player
 
 ### Example Scenarios:
 
-- **Empty match, pool has**: 2M-Adv, 1F-Adv, 2M-Int, 2F-Int, 1M-Nov
-  - Selects: 1F-Adv → 1M-Int → 1F-Int → 1M-Nov (balanced gender and mixed levels)
-  
-- **Expert with longest wait time**:
-  - Only selects other Expert players, balances gender among experts
-  - Leaves slots empty if not enough experts
-
-- **Match already has 2 males**:
-  - Next picks prioritize female players to balance gender
+- **Expert male waiting longest**: Only selects other Expert male players, leaves slots empty if insufficient
+- **Expert female in match**: Only adds Expert female players
+- **Match ID is even (mixed mode)**: Selects players alternating genders for 2M+2F balance
+- **Match ID is odd (single gender)**: Selects all male or all female based on longest wait
 
 ## CSV Format
 
@@ -152,3 +149,37 @@ All application data is automatically saved to your browser's localStorage:
 - **baddixx_courts**: Court configurations and active matches
 
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
+
+## Version History
+
+- **v1.1.4** - CSV import fix
+  - Fixed bug where importing CSV caused duplicate entries in UI when sorting
+  - Improved ID generation for imported players (unique sequential IDs)
+  - Added stable sorting with ID tiebreaker
+
+- **v1.1.3** - Data improvements
+  - Restored default player database (136 players from baddixx_players.csv)
+  - CSV export now only includes name, gender, and level (no id)
+
+- **v1.1.2** - Clean slate
+  - Removed default player database (app starts empty)
+  - Import your players via CSV or add them manually
+
+- **v1.1.1** - Bug fixes
+  - Fixed bug where adding a player to pool could sometimes add duplicates
+  - Improved state management with functional updates throughout the app
+  
+- **v1.1.0** - Smart Match algorithm overhaul
+  - Expert males only with expert males
+  - Expert females only with expert females
+  - 50/50 single-gender vs mixed-gender matches
+  - Improved gender and skill balancing
+  - Added "Clear Pool" button in Player Database
+  
+- **v1.0.0** - Initial release
+  - Player database management with 136 pre-loaded players
+  - Player pool with idle time tracking
+  - Smart Match algorithm with gender and skill balancing
+  - Court management with match timer
+  - CSV import/export
+  - localStorage persistence

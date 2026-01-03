@@ -15,6 +15,7 @@ const PlayerDatabaseModal = ({
   onDeletePlayer, 
   onAddToPool, 
   onRemoveFromPool,
+  onRemoveAllFromPool,
   poolPlayers, 
   onImportPlayers 
 }) => {
@@ -107,7 +108,7 @@ const PlayerDatabaseModal = ({
     event.target.value = '';
   };
 
-  const filteredPlayers = players
+  const filteredPlayers = [...players]
     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
       let comparison = 0;
@@ -118,6 +119,11 @@ const PlayerDatabaseModal = ({
         comparison = a.gender.localeCompare(b.gender);
       } else if (sortBy === 'level') {
         comparison = levelOrder[a.level] - levelOrder[b.level];
+      }
+      
+      // Use ID as tiebreaker for stable sorting
+      if (comparison === 0) {
+        comparison = a.id - b.id;
       }
       
       return sortOrder === 'asc' ? comparison : -comparison;
@@ -146,6 +152,22 @@ const PlayerDatabaseModal = ({
         <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-white tracking-wide">Player Database Management</h2>
           <div className="flex items-center gap-3">
+            {/* Remove All from Pool Button */}
+            {poolPlayers.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Remove all ${poolPlayers.length} players from the pool?`)) {
+                    onRemoveAllFromPool();
+                  }
+                }}
+                className="bg-red-500/30 hover:bg-red-500/50 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear Pool ({poolPlayers.length})
+              </button>
+            )}
             {/* Export Button */}
             <button
               onClick={handleExportCSV}

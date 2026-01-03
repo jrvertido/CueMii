@@ -1,6 +1,8 @@
 {
   "name": "baddixx-cuemii-app",
-  "version": "1.0.0",
+  "version": "1.1.4",
+  "description": "BADDIXX CueMii App - Badminton court and player management system",
+  "author": "Joseph Vertido",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

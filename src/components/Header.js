@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_VERSION } from '../data/initialData';
 
 /**
  * Application header with logo and manage players button
@@ -21,6 +22,8 @@ const Header = ({ onOpenDatabase, onResetData }) => {
             <p className="text-pink-400 font-semibold tracking-wide">CueMii App</p>
             <p className="text-slate-500 text-xs">Created by Joseph Vertido</p>
           </div>
+          <div className="h-8 w-px bg-slate-700 ml-2" />
+          <span className="text-slate-600 text-xs font-mono">v{APP_VERSION}</span>
         </div>
         
         <div className="flex items-center gap-3">
