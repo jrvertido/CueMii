@@ -21,7 +21,7 @@ const CourtsPanel = ({
   currentTime
 }) => {
   return (
-    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden sticky top-6">
+    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
       <div className="bg-gradient-to-r from-emerald-600/20 to-green-600/20 border-b border-slate-700/50 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -57,7 +57,7 @@ const CourtsPanel = ({
         </div>
       </div>
       
-      <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
+      <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
         {courts.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,7 +149,7 @@ const CourtsPanel = ({
                         >
                           <div className="flex items-center gap-1.5">
                             <GenderIcon gender={player.gender} />
-                            <span className="text-sm text-white truncate">{player.name}</span>
+                            <span className={`text-sm truncate ${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>{player.name}</span>
                           </div>
                           <div className="mt-1">
                             <LevelBadge level={player.level} />

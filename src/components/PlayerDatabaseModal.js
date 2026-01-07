@@ -382,10 +382,10 @@ const PlayerDatabaseModal = ({
                     ) : (
                       <>
                         <td className="py-3 px-2">
-                          <span className="text-white font-medium">{player.name}</span>
+                          <span className={`font-medium ${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>{player.name}</span>
                         </td>
                         <td className="py-3 px-2">
-                          <span className={`${player.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`}>
+                          <span className={`${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>
                             {player.gender === 'male' ? '♂' : '♀'} {player.gender}
                           </span>
                         </td>

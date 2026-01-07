@@ -17,7 +17,8 @@ const PlayerPool = ({
   removeFromPool,
   selectedMatch,
   addPlayerToMatch,
-  selectedMatchId
+  selectedMatchId,
+  clearIdleTimes
 }) => {
   // Filter pool players based on search and level filter
   const filteredPoolPlayers = poolPlayers
@@ -25,11 +26,74 @@ const PlayerPool = ({
       const matchesSearch = p.name.toLowerCase().includes(poolSearch.toLowerCase());
       const matchesLevel = poolLevelFilter === 'All' || p.level === poolLevelFilter;
       return matchesSearch && matchesLevel;
-    })
-    .sort((a, b) => a.joinedAt - b.joinedAt); // Sort by longest wait time first
+    });
+
+  // Split into available and in-match players
+  const availablePlayers = filteredPoolPlayers
+    .filter(p => !isPlayerInMatch(p.id))
+    .sort((a, b) => a.joinedAt - b.joinedAt); // Longest wait first
+  
+  const playersInMatch = filteredPoolPlayers
+    .filter(p => isPlayerInMatch(p.id))
+    .sort((a, b) => a.joinedAt - b.joinedAt);
+
+  // Handle Clear Timers with confirmation
+  const handleClearTimers = () => {
+    if (window.confirm('Are you sure you want to clear all player idle times? This will reset everyone\'s wait time to now.')) {
+      clearIdleTimes();
+    }
+  };
+
+  // Player card component - compact for 2-column layout
+  const PlayerCard = ({ player, inMatch }) => (
+    <div
+      className={`group bg-slate-800/50 rounded-lg p-2 border transition-all ${
+        inMatch 
+          ? 'border-yellow-500/30 opacity-70' 
+          : 'border-slate-700/50 hover:border-cyan-500/50'
+      }`}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <GenderIcon gender={player.gender} />
+          <span className={`font-medium text-sm truncate ${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>{player.name}</span>
+        </div>
+        {!inMatch && (
+          <button
+            onClick={() => removeFromPool(player.id)}
+            className="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-0.5 rounded transition-all flex-shrink-0"
+            title="Remove from pool"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <LevelBadge level={player.level} />
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-slate-500" title="Wait time">
+            ⏱{formatWaitTime(player.joinedAt)}
+          </span>
+          <span className="text-emerald-400" title="Games played">
+            🎮{player.playCount || 0}
+          </span>
+        </div>
+      </div>
+      {selectedMatch && !inMatch && selectedMatch.players.length < 4 && (
+        <button
+          onClick={() => addPlayerToMatch(selectedMatchId, player)}
+          className="mt-1.5 w-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-xs py-1 rounded transition-colors"
+        >
+          + Add to Match
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden sticky top-6">
+    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
       <div className="bg-gradient-to-r from-cyan-600/20 to-teal-600/20 border-b border-slate-700/50 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -43,6 +107,18 @@ const PlayerPool = ({
               <p className="text-slate-400 text-sm">{poolPlayers.length} players waiting</p>
             </div>
           </div>
+          {/* Clear Timers Button */}
+          <button
+            onClick={handleClearTimers}
+            disabled={poolPlayers.length === 0}
+            className="bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-slate-300 hover:text-white disabled:text-slate-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+            title="Reset all idle times to now"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Clear Timers
+          </button>
         </div>
         
         {/* Search and Filter */}
@@ -72,7 +148,7 @@ const PlayerPool = ({
         </div>
       </div>
       
-      <div className="p-4 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
+      <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
         {filteredPoolPlayers.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,57 +158,44 @@ const PlayerPool = ({
             <p className="text-sm mt-1">Add players from the database</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {filteredPoolPlayers.map(player => {
-              const inMatch = isPlayerInMatch(player.id);
-              return (
-                <div
-                  key={player.id}
-                  className={`group bg-slate-800/50 rounded-xl p-3 border transition-all ${
-                    inMatch 
-                      ? 'border-yellow-500/30 opacity-60' 
-                      : 'border-slate-700/50 hover:border-cyan-500/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <GenderIcon gender={player.gender} />
-                      <span className="font-medium text-white">{player.name}</span>
-                    </div>
-                    {!inMatch && (
-                      <button
-                        onClick={() => removeFromPool(player.id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-1 rounded transition-all"
-                        title="Remove from pool"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <LevelBadge level={player.level} />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">
-                        ⏱ {formatWaitTime(player.joinedAt)}
-                      </span>
-                      {inMatch && (
-                        <span className="text-xs text-yellow-400">In Match</span>
-                      )}
-                    </div>
-                  </div>
-                  {selectedMatch && !inMatch && selectedMatch.players.length < 4 && (
-                    <button
-                      onClick={() => addPlayerToMatch(selectedMatchId, player)}
-                      className="mt-2 w-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-sm py-1.5 rounded-lg transition-colors"
-                    >
-                      Add to Selected Match
-                    </button>
-                  )}
+          <div className="space-y-4">
+            {/* Available Players Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider">
+                  Available ({availablePlayers.length})
+                </h3>
+              </div>
+              {availablePlayers.length === 0 ? (
+                <div className="text-center py-4 text-slate-500 text-sm bg-slate-800/30 rounded-lg">
+                  No available players
                 </div>
-              );
-            })}
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {availablePlayers.map(player => (
+                    <PlayerCard key={player.id} player={player} inMatch={false} />
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Players In Match Section */}
+            {playersInMatch.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 pt-2 border-t border-slate-700/50">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                  <h3 className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">
+                    In Match ({playersInMatch.length})
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {playersInMatch.map(player => (
+                    <PlayerCard key={player.id} player={player} inMatch={true} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

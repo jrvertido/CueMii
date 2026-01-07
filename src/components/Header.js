@@ -17,13 +17,11 @@ const Header = ({ onOpenDatabase, onResetData }) => {
             alt="Baddixx" 
             className="h-12 w-auto object-contain"
           />
-          <div className="h-8 w-px bg-slate-700" />
+          <div className="h-10 w-px bg-slate-700" />
           <div>
-            <p className="text-pink-400 font-semibold tracking-wide">CueMii App</p>
-            <p className="text-slate-500 text-xs">Created by Joseph Vertido</p>
+            <p className="text-pink-400 font-bold tracking-wide text-2xl">CueMii App</p>
+            <p className="text-slate-500 text-xs">Created by Joseph Vertido · v{APP_VERSION}</p>
           </div>
-          <div className="h-8 w-px bg-slate-700 ml-2" />
-          <span className="text-slate-600 text-xs font-mono">v{APP_VERSION}</span>
         </div>
         
         <div className="flex items-center gap-3">

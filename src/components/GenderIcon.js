@@ -6,7 +6,7 @@ import React from 'react';
  * @param {string} props.gender - 'male' or 'female'
  */
 const GenderIcon = ({ gender }) => (
-  <span className={`${gender === 'male' ? 'text-blue-400' : 'text-pink-400'} font-bold`}>
+  <span className={`text-lg ${gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>
     {gender === 'male' ? '♂' : '♀'}
   </span>
 );
