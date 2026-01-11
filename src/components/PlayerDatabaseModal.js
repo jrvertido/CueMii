@@ -18,7 +18,8 @@ const PlayerDatabaseModal = ({
   onRemoveAllFromPool,
   poolPlayers,
   notPresentPlayers = [],
-  onImportPlayers 
+  onImportPlayers,
+  isDarkMode = true
 }) => {
   const [newPlayer, setNewPlayer] = useState({ name: '', gender: 'male', level: 'Intermediate' });
   const [editingPlayer, setEditingPlayer] = useState(null);

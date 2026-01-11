@@ -31,11 +31,11 @@ const MatchQueue = ({
   smartMatchedPlayers = {},
   currentTime,
   averageWaitTime = 20,
-  reorderMatches
+  clearAllMatches,
+  swapMatchPlayers
 }) => {
   const [dragOverMatchId, setDragOverMatchId] = useState(null);
   const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
-  const [draggingMatchId, setDraggingMatchId] = useState(null);
   const dropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -111,18 +111,6 @@ const MatchQueue = ({
     }
   };
 
-  // Match reorder drag handlers
-  const handleMatchDragStart = (e, matchId) => {
-    e.stopPropagation();
-    e.dataTransfer.setData('matchId', String(matchId));
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggingMatchId(matchId);
-  };
-
-  const handleMatchDragEnd = () => {
-    setDraggingMatchId(null);
-  };
-
   return (
     <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
       isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-300'
@@ -178,6 +166,28 @@ const MatchQueue = ({
                 Undo All
               </button>
             )}
+            {/* Clear All Matches Button */}
+            {matches.length > 0 && matches.some(m => m.players.length > 0) && (
+              <button
+                onClick={() => {
+                  const totalPlayers = matches.reduce((sum, m) => sum + m.players.length, 0);
+                  if (window.confirm(`Clear all players from ${matches.length} matches?\n\nThis will remove ${totalPlayers} player(s) from all matches and return them to the pool.`)) {
+                    clearAllMatches();
+                  }
+                }}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 border ${
+                  isDarkMode 
+                    ? 'bg-slate-700 hover:bg-red-500/20 border-slate-600 text-slate-300 hover:text-red-400 hover:border-red-500/50' 
+                    : 'bg-slate-100 hover:bg-red-100 border-slate-300 text-slate-600 hover:text-red-600 hover:border-red-400'
+                }`}
+                title="Clear all players from all matches"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear All
+              </button>
+            )}
             <button
               onClick={createMatch}
               className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 px-3 py-1.5 rounded-lg font-semibold transition-all shadow-lg shadow-orange-500/25 flex items-center gap-1 text-sm text-white"
@@ -201,10 +211,14 @@ const MatchQueue = ({
           </div>
         ) : (
           <div className="space-y-2">
-            {[...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0)).map(match => {
+            {(() => {
+              const sortedMatches = [...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+              return sortedMatches.map((match, matchIndex) => {
               const isComplete = match.players.length === 4;
               const isDragOver = dragOverMatchId === match.id && !isComplete;
               const hasPreferredCourts = match.preferredCourts && match.preferredCourts.length > 0;
+              const isFirstMatch = matchIndex === 0;
+              const isLastMatch = matchIndex === sortedMatches.length - 1;
               
               // Determine background and border colors based on theme
               let bgClass, borderClass;
@@ -233,36 +247,11 @@ const MatchQueue = ({
               return (
               <div
                 key={match.id}
-                onDragOver={(e) => {
-                  // Handle match reorder drag
-                  if (draggingMatchId && draggingMatchId !== match.id) {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                  } else {
-                    // Handle player drag
-                    handleDragOver(e, match.id);
-                  }
-                }}
+                onDragOver={(e) => handleDragOver(e, match.id)}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => {
-                  // Check if it's a match reorder drop first
-                  const matchIdData = e.dataTransfer.getData('matchId');
-                  if (matchIdData) {
-                    e.preventDefault();
-                    const draggedMatchId = Number(matchIdData);
-                    if (draggedMatchId && draggedMatchId !== match.id && reorderMatches) {
-                      reorderMatches(draggedMatchId, match.id);
-                    }
-                    setDraggingMatchId(null);
-                  } else {
-                    // Handle player drop
-                    handleDrop(e, match.id);
-                  }
-                }}
+                onDrop={(e) => handleDrop(e, match.id)}
                 className={`rounded-lg border transition-all ${bgClass} ${selectedClass || borderClass} ${
                   selectedMatchId !== match.id ? 'hover:border-slate-600' : ''
-                } ${draggingMatchId === match.id ? 'opacity-50' : ''} ${
-                  draggingMatchId && draggingMatchId !== match.id ? 'border-dashed' : ''
                 }`}
               >
                 {/* Preferred Courts Label */}
@@ -293,20 +282,6 @@ const MatchQueue = ({
                   {/* Header Row */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5">
-                      {/* Drag Handle */}
-                      <div
-                        draggable
-                        onDragStart={(e) => handleMatchDragStart(e, match.id)}
-                        onDragEnd={handleMatchDragEnd}
-                        className={`cursor-grab active:cursor-grabbing p-0.5 rounded ${
-                          isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'
-                        }`}
-                        title="Drag to reorder"
-                      >
-                        <svg className={`w-4 h-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                        </svg>
-                      </div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
                         isDarkMode 
                           ? 'text-orange-300 bg-orange-500/20 border-orange-500/50' 
@@ -390,6 +365,41 @@ const MatchQueue = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {/* Up/Down arrows for reordering */}
+                      <div className="flex flex-col">
+                        <button
+                          onClick={() => swapMatchPlayers(match.id, 'up')}
+                          disabled={isFirstMatch}
+                          className={`p-0.5 rounded transition-colors ${
+                            isFirstMatch 
+                              ? 'opacity-30 cursor-not-allowed' 
+                              : isDarkMode 
+                                ? 'hover:bg-slate-600 text-slate-400 hover:text-slate-200' 
+                                : 'hover:bg-slate-200 text-slate-500 hover:text-slate-700'
+                          }`}
+                          title="Move players up"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => swapMatchPlayers(match.id, 'down')}
+                          disabled={isLastMatch}
+                          className={`p-0.5 rounded transition-colors ${
+                            isLastMatch 
+                              ? 'opacity-30 cursor-not-allowed' 
+                              : isDarkMode 
+                                ? 'hover:bg-slate-600 text-slate-400 hover:text-slate-200' 
+                                : 'hover:bg-slate-200 text-slate-500 hover:text-slate-700'
+                          }`}
+                          title="Move players down"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                       <button
                         onClick={() => smartMatch(match.id)}
                         disabled={match.players.length >= 4 || getAvailablePoolPlayers().length === 0}
@@ -432,7 +442,14 @@ const MatchQueue = ({
                         </button>
                       )}
                       <button
-                        onClick={() => deleteMatch(match.id)}
+                        onClick={() => {
+                          const matchToDelete = matches.find(m => m.id === match.id);
+                          const playerCount = matchToDelete?.players?.length || 0;
+                          const playerNames = matchToDelete?.players?.map(p => p.name).join(', ') || 'No players';
+                          if (window.confirm(`Delete Match #${match.matchNumber}?\n\nPlayers: ${playerCount > 0 ? playerNames : 'None'}\n\nThis will move the match to history.`)) {
+                            deleteMatch(match.id);
+                          }
+                        }}
                         className="text-red-400 hover:text-red-300 p-0.5 rounded hover:bg-red-500/10 transition-colors"
                         title="Delete match"
                       >
@@ -458,11 +475,11 @@ const MatchQueue = ({
                               ? isRecentSmart
                                 ? player.gender === 'male'
                                   ? isDarkMode 
-                                    ? 'bg-blue-900/60 border-amber-400 ring-2 ring-amber-400/70 cursor-grab active:cursor-grabbing'
-                                    : 'bg-blue-100 border-amber-500 ring-2 ring-amber-500/70 cursor-grab active:cursor-grabbing'
+                                    ? 'bg-blue-900/60 border-amber-400 ring-2 ring-amber-400/70 animate-smart-match cursor-grab active:cursor-grabbing'
+                                    : 'bg-blue-100 border-amber-500 ring-2 ring-amber-500/70 animate-smart-match cursor-grab active:cursor-grabbing'
                                   : isDarkMode 
-                                    ? 'bg-pink-900/60 border-amber-400 ring-2 ring-amber-400/70 cursor-grab active:cursor-grabbing'
-                                    : 'bg-pink-100 border-amber-500 ring-2 ring-amber-500/70 cursor-grab active:cursor-grabbing'
+                                    ? 'bg-pink-900/60 border-amber-400 ring-2 ring-amber-400/70 animate-smart-match cursor-grab active:cursor-grabbing'
+                                    : 'bg-pink-100 border-amber-500 ring-2 ring-amber-500/70 animate-smart-match cursor-grab active:cursor-grabbing'
                                 : player.gender === 'male'
                                   ? isDarkMode 
                                     ? 'bg-blue-900/60 border-blue-500/50 cursor-grab active:cursor-grabbing'
@@ -597,7 +614,8 @@ const MatchQueue = ({
                 </div>
               </div>
               );
-            })}
+            });
+            })()}
           </div>
         )}
       </div>

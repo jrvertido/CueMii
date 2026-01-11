@@ -336,26 +336,31 @@ function App() {
     }
   };
 
-  // Reorder matches by drag and drop
-  const reorderMatches = (draggedMatchId, targetMatchId) => {
-    if (draggedMatchId === targetMatchId) return;
-    
+  // Clear all players from all matches
+  const clearAllMatches = () => {
+    setMatches(prev => prev.map(m => ({ ...m, players: [] })));
+    setLastSmartMatch(null);
+    setLastSmartQueueAll(null);
+  };
+
+  // Swap players between two adjacent matches
+  const swapMatchPlayers = (matchId, direction) => {
     setMatches(prev => {
+      const matchIndex = prev.findIndex(m => m.id === matchId);
+      if (matchIndex === -1) return prev;
+      
+      const targetIndex = direction === 'up' ? matchIndex - 1 : matchIndex + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      
       const newMatches = [...prev];
-      const draggedIndex = newMatches.findIndex(m => m.id === draggedMatchId);
-      const targetIndex = newMatches.findIndex(m => m.id === targetMatchId);
+      const currentPlayers = newMatches[matchIndex].players;
+      const targetPlayers = newMatches[targetIndex].players;
       
-      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      // Swap players
+      newMatches[matchIndex] = { ...newMatches[matchIndex], players: targetPlayers };
+      newMatches[targetIndex] = { ...newMatches[targetIndex], players: currentPlayers };
       
-      // Remove dragged match and insert at target position
-      const [draggedMatch] = newMatches.splice(draggedIndex, 1);
-      newMatches.splice(targetIndex, 0, draggedMatch);
-      
-      // Reassign match numbers based on new order
-      return newMatches.map((match, index) => ({
-        ...match,
-        matchNumber: index + 1
-      }));
+      return newMatches;
     });
   };
 
@@ -1459,7 +1464,8 @@ function App() {
               smartMatchedPlayers={smartMatchedPlayers}
               currentTime={currentTime}
               averageWaitTime={averageWaitTime}
-              reorderMatches={reorderMatches}
+              clearAllMatches={clearAllMatches}
+              swapMatchPlayers={swapMatchPlayers}
             />
           </div>
 

@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 2.9.6**
+**Version 2.9.10**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -160,14 +160,20 @@ Data persists across browser refreshes and sessions. Use the **Reset** button in
 
 ## Version History
 
-- **v2.9.6** - Fix Match Drag & Drop
-  - Fixed drag and drop reordering for matches
-  - Improved event handling to prevent conflicts with player drag/drop
+- **v2.9.10** - Brighter Court Highlight
+  - Made court pulsating highlight a brighter yellow color
+  - Added glow effect to court highlight for better visibility
 
-- **v2.9.5** - Match Queue Drag & Drop Reordering
-  - Added ability to reorder matches by dragging and dropping
-  - Drag handle (≡ icon) appears before each match number
-  - Match numbers automatically update based on new order
+- **v2.9.9** - Smart Match Pulsating Highlight
+  - Smart matched players now have a pulsating golden glow animation
+  - Animation lasts for 3 minutes after smart matching
+
+- **v2.9.8** - Match Queue Management Improvements
+  - Delete match now shows confirmation warning with player names
+  - Added "Clear All" button in Match Queue header to clear all players from all matches (with confirmation)
+  - Added up/down arrows on each match to swap players with adjacent matches
+
+- **v2.9.7** - Removed Match Drag & Drop Feature
 
 - **v2.9.4** - Match History Export Simplified
   - Simplified Excel export columns: Match #, Status, Court, Player 1-4 (names only), Start Time, End Time, Duration
