@@ -32,11 +32,33 @@ const MatchQueue = ({
   currentTime,
   averageWaitTime = 20,
   clearAllMatches,
-  swapMatchPlayers
+  swapMatchPlayers,
+  returnedMatches = {}
 }) => {
   const [dragOverMatchId, setDragOverMatchId] = useState(null);
   const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
   const dropdownRef = useRef(null);
+  const matchRefs = useRef({});
+  const scrollContainerRef = useRef(null);
+  const [lastScrolledMatchId, setLastScrolledMatchId] = useState(null);
+
+  // Scroll to recently returned match
+  useEffect(() => {
+    // Find the most recently returned match
+    const returnedEntries = Object.entries(returnedMatches);
+    if (returnedEntries.length === 0) return;
+    
+    // Sort by timestamp descending to get most recent
+    const mostRecent = returnedEntries.sort((a, b) => b[1] - a[1])[0];
+    const [matchId, timestamp] = mostRecent;
+    
+    // Only scroll if this is a new return (within last 500ms) and we haven't scrolled to it yet
+    const isRecent = Date.now() - timestamp < 500;
+    if (isRecent && matchId !== lastScrolledMatchId && matchRefs.current[matchId]) {
+      matchRefs.current[matchId].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setLastScrolledMatchId(matchId);
+    }
+  }, [returnedMatches, lastScrolledMatchId]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -215,16 +237,24 @@ const MatchQueue = ({
               const sortedMatches = [...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
               return sortedMatches.map((match, matchIndex) => {
               const isComplete = match.players.length === 4;
+              const isIncomplete = match.players.length > 0 && match.players.length < 4;
               const isDragOver = dragOverMatchId === match.id && !isComplete;
               const hasPreferredCourts = match.preferredCourts && match.preferredCourts.length > 0;
               const isFirstMatch = matchIndex === 0;
               const isLastMatch = matchIndex === sortedMatches.length - 1;
+              
+              // Check if match was recently returned from court (within 30 seconds)
+              const returnedTime = returnedMatches[match.id];
+              const isRecentlyReturned = returnedTime && (Date.now() - returnedTime) < 30000;
               
               // Determine background and border colors based on theme
               let bgClass, borderClass;
               if (isDragOver) {
                 bgClass = isDarkMode ? 'bg-cyan-900/40' : 'bg-cyan-50';
                 borderClass = isDarkMode ? 'border-cyan-400 shadow-lg shadow-cyan-500/20' : 'border-cyan-500 shadow-md shadow-cyan-500/20';
+              } else if (isRecentlyReturned) {
+                bgClass = isDarkMode ? 'bg-red-900/30' : 'bg-red-50/70';
+                borderClass = 'border-red-500 animate-pulse-returned';
               } else if (hasPreferredCourts) {
                 bgClass = isDarkMode ? 'bg-amber-900/30' : 'bg-amber-50/70';
                 borderClass = isDarkMode ? 'border-amber-500/50' : 'border-amber-400';
@@ -247,6 +277,7 @@ const MatchQueue = ({
               return (
               <div
                 key={match.id}
+                ref={el => matchRefs.current[match.id] = el}
                 onDragOver={(e) => handleDragOver(e, match.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, match.id)}
@@ -359,9 +390,11 @@ const MatchQueue = ({
                       <span className={`text-xs font-medium ${
                         isComplete 
                           ? (isDarkMode ? 'text-emerald-400' : 'text-emerald-600') 
-                          : (isDarkMode ? 'text-slate-400' : 'text-slate-600')
+                          : isIncomplete
+                            ? 'text-red-500 font-bold'
+                            : (isDarkMode ? 'text-slate-400' : 'text-slate-600')
                       }`}>
-                        {match.players.length}/4 {isComplete && '✓'}
+                        {match.players.length}/4 {isComplete ? '✓' : isIncomplete ? '✗' : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -573,7 +606,11 @@ const MatchQueue = ({
                     
                     return (
                       <div className="flex gap-1">
-                        {filteredCourts.map(court => {
+                        {!isComplete ? (
+                          <div className={`flex-1 text-center text-xs py-1 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
+                            Need 4 players to assign court
+                          </div>
+                        ) : filteredCourts.map(court => {
                           const isWantedByHigher = courtsWaitedByHigherMatches.has(court.id);
                           let buttonClass;
                           if (hasPreferredCourts) {
@@ -603,7 +640,7 @@ const MatchQueue = ({
                             </button>
                           );
                         })}
-                        {filteredCourts.length === 0 && (
+                        {isComplete && filteredCourts.length === 0 && (
                           <div className="flex-1 text-center text-slate-500 text-xs py-1">
                             {hasPreferredCourts ? 'Preferred courts busy' : 'No courts available'}
                           </div>

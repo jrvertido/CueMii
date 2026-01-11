@@ -8,13 +8,27 @@ import {
   PlayerPool,
   MatchQueue,
   CourtsPanel,
-  MatchHistoryModal
+  MatchHistoryModal,
+  LicenseEntryModal,
+  AboutModal
 } from './components';
+import { 
+  validateLicense, 
+  loadLicense, 
+  isLicenseExpired,
+  clearLicense 
+} from './utils/licenseUtils';
 
 /**
  * Main Baddixx Queuing System Application
  */
 function App() {
+  // License State
+  const [licenseInfo, setLicenseInfo] = useState(null);
+  const [isLicenseValid, setIsLicenseValid] = useState(false);
+  const [isLicenseExpiredState, setIsLicenseExpiredState] = useState(false);
+  const [isCheckingLicense, setIsCheckingLicense] = useState(true);
+
   // Theme State
   const [isDarkMode, setIsDarkMode] = useLocalStorage('baddixx_darkMode', true);
   
@@ -31,6 +45,7 @@ function App() {
   // UI State (not persisted)
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [poolLevelFilter, setPoolLevelFilter] = useState('All');
   const [selectedMatchId, setSelectedMatchId] = useState(null);
@@ -41,8 +56,62 @@ function App() {
   const [lastSmartQueueAll, setLastSmartQueueAll] = useState(null); // For undo Smart Queue All
   const [smartMatchedPlayers, setSmartMatchedPlayers] = useState({}); // Track when players were smart matched: { playerId: timestamp }
   const [removedWhileOnCourt, setRemovedWhileOnCourt] = useState(new Set()); // Track players removed while on court
+  const [returnedMatches, setReturnedMatches] = useState({}); // Track when matches were returned from court: { matchId: timestamp }
   
   const currentTime = useCurrentTime();
+
+  // Check license on app load
+  useEffect(() => {
+    const storedLicense = loadLicense();
+    if (storedLicense) {
+      const result = validateLicense(storedLicense);
+      if (result.isValid) {
+        if (isLicenseExpired(result.expirationDate)) {
+          setIsLicenseExpiredState(true);
+          setIsLicenseValid(false);
+          clearLicense();
+        } else {
+          setLicenseInfo(result);
+          setIsLicenseValid(true);
+        }
+      }
+    }
+    setIsCheckingLicense(false);
+  }, []);
+
+  // Periodically check license expiration
+  useEffect(() => {
+    if (!licenseInfo?.expirationDate) return;
+    
+    const checkExpiration = () => {
+      if (isLicenseExpired(licenseInfo.expirationDate)) {
+        setIsLicenseExpiredState(true);
+        setIsLicenseValid(false);
+        clearLicense();
+      }
+    };
+    
+    const interval = setInterval(checkExpiration, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [licenseInfo]);
+
+  // Handle valid license entry
+  const handleLicenseValid = (result) => {
+    setLicenseInfo(result);
+    setIsLicenseValid(true);
+    setIsLicenseExpiredState(false);
+  };
+
+  // Handle license update from About modal
+  const handleLicenseUpdate = (result) => {
+    setLicenseInfo(result);
+  };
+
+  // Get visible players (limited by license)
+  const getVisiblePlayers = () => {
+    if (!licenseInfo?.maxPlayers) return players;
+    return players.slice(0, licenseInfo.maxPlayers);
+  };
 
   // Calculate average wait time (minimum 20 minutes)
   const averageWaitTime = React.useMemo(() => {
@@ -1366,6 +1435,12 @@ function App() {
         // Add the match back to the matches queue with filtered players
         setMatches(prevMatches => [...prevMatches, matchWithFilteredPlayers]);
         
+        // Track that this match was returned (for pulsating highlight)
+        setReturnedMatches(prev => ({
+          ...prev,
+          [court.match.id]: Date.now()
+        }));
+        
         // Clear the removed players from tracking
         const matchPlayerIds = court.match.players.map(p => p.id);
         setRemovedWhileOnCourt(prevRemoved => {
@@ -1392,6 +1467,30 @@ function App() {
   const themeClasses = isDarkMode 
     ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white'
     : 'bg-gradient-to-br from-slate-100 via-white to-slate-100 text-slate-900';
+
+  // Show loading state while checking license
+  if (isCheckingLicense) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <span className="text-3xl">🏸</span>
+          </div>
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show license entry modal if no valid license
+  if (!isLicenseValid) {
+    return (
+      <LicenseEntryModal 
+        onLicenseValid={handleLicenseValid}
+        isExpired={isLicenseExpiredState}
+      />
+    );
+  }
   
   return (
     <div className={`min-h-screen ${themeClasses}`}>
@@ -1402,9 +1501,11 @@ function App() {
       <Header 
         onOpenDatabase={() => setIsDbModalOpen(true)} 
         onOpenHistory={() => setIsHistoryModalOpen(true)}
+        onOpenAbout={() => setIsAboutModalOpen(true)}
         onResetData={resetAllData}
         isDarkMode={isDarkMode}
         toggleTheme={() => setIsDarkMode(!isDarkMode)}
+        licenseInfo={licenseInfo}
       />
 
       {/* Main Content */}
@@ -1466,6 +1567,7 @@ function App() {
               averageWaitTime={averageWaitTime}
               clearAllMatches={clearAllMatches}
               swapMatchPlayers={swapMatchPlayers}
+              returnedMatches={returnedMatches}
             />
           </div>
 
@@ -1495,7 +1597,7 @@ function App() {
       <PlayerDatabaseModal
         isOpen={isDbModalOpen}
         onClose={() => setIsDbModalOpen(false)}
-        players={players}
+        players={getVisiblePlayers()}
         onAddPlayer={addPlayer}
         onEditPlayer={editPlayer}
         onDeletePlayer={deletePlayer}
@@ -1506,6 +1608,8 @@ function App() {
         notPresentPlayers={notPresentPlayers}
         onImportPlayers={importPlayers}
         isDarkMode={isDarkMode}
+        licenseInfo={licenseInfo}
+        totalPlayerCount={players.length}
       />
 
       {/* Match History Modal */}
@@ -1515,6 +1619,16 @@ function App() {
         matchHistory={matchHistory}
         clearHistory={clearMatchHistory}
         isDarkMode={isDarkMode}
+      />
+
+      {/* About Modal */}
+      <AboutModal
+        isOpen={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
+        isDarkMode={isDarkMode}
+        licenseInfo={licenseInfo}
+        onLicenseUpdate={handleLicenseUpdate}
+        playerDatabaseCount={players.length}
       />
     </div>
   );

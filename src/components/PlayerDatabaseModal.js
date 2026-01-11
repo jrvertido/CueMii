@@ -19,7 +19,9 @@ const PlayerDatabaseModal = ({
   poolPlayers,
   notPresentPlayers = [],
   onImportPlayers,
-  isDarkMode = true
+  isDarkMode = true,
+  licenseInfo = null,
+  totalPlayerCount = 0
 }) => {
   const [newPlayer, setNewPlayer] = useState({ name: '', gender: 'male', level: 'Intermediate' });
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -31,6 +33,12 @@ const PlayerDatabaseModal = ({
   const [newlyAddedPlayerIds, setNewlyAddedPlayerIds] = useState([]);
   
   const playerListRef = useRef(null);
+
+  // License limits
+  const maxPlayers = licenseInfo?.maxPlayers || Infinity;
+  const remainingSlots = Math.max(0, maxPlayers - totalPlayerCount);
+  const isAtLimit = totalPlayerCount >= maxPlayers;
+  const hasHiddenPlayers = totalPlayerCount > maxPlayers;
 
   // Handle modal close - reset newly added players
   const handleClose = () => {
@@ -98,8 +106,23 @@ const PlayerDatabaseModal = ({
         }
 
         if (importedPlayers.length > 0) {
-          onImportPlayers(importedPlayers);
-          setImportSuccess(`Successfully imported ${importedPlayers.length} player(s)`);
+          // Check license limit
+          const availableSlots = maxPlayers - totalPlayerCount;
+          let playersToImport = importedPlayers;
+          let limitMessage = '';
+          
+          if (availableSlots <= 0) {
+            setImportError(`Cannot import players. Player limit reached (${maxPlayers} players). Please upgrade your license.`);
+            return;
+          }
+          
+          if (importedPlayers.length > availableSlots) {
+            playersToImport = importedPlayers.slice(0, availableSlots);
+            limitMessage = ` (${importedPlayers.length - availableSlots} player(s) were not imported due to license limit of ${maxPlayers})`;
+          }
+          
+          onImportPlayers(playersToImport);
+          setImportSuccess(`Successfully imported ${playersToImport.length} player(s)${limitMessage}`);
           if (errors.length > 0) {
             setImportError(`${errors.length} row(s) skipped due to errors`);
           }
@@ -153,6 +176,12 @@ const PlayerDatabaseModal = ({
     });
 
   const handleAddPlayer = () => {
+    // Check license limit
+    if (isAtLimit) {
+      alert(`Player limit reached (${maxPlayers} players).\n\nYour license allows a maximum of ${maxPlayers} players. Please upgrade your license to add more players.`);
+      return;
+    }
+    
     if (newPlayer.name.trim()) {
       const newId = Date.now();
       onAddPlayer({ ...newPlayer, id: newId, name: newPlayer.name.trim() });
@@ -181,7 +210,22 @@ const PlayerDatabaseModal = ({
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl w-[800px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border border-cyan-500/20">
         {/* Header */}
         <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-4 py-2.5 flex justify-between items-center flex-shrink-0">
-          <h2 className="text-lg font-bold text-white tracking-wide">Player Database</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-white tracking-wide">Player Database</h2>
+            {/* Player Count / License Limit */}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              isAtLimit 
+                ? 'bg-red-500/30 text-red-200' 
+                : remainingSlots <= 10 
+                  ? 'bg-amber-500/30 text-amber-200' 
+                  : 'bg-white/20 text-white/80'
+            }`}>
+              {players.length}/{maxPlayers === Infinity ? '∞' : maxPlayers} players
+              {remainingSlots <= 20 && maxPlayers !== Infinity && (
+                <span className="ml-1">({remainingSlots} left)</span>
+              )}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             {/* Remove All from Pool Button */}
             {(poolPlayers.length > 0 || notPresentPlayers.length > 0) && (
@@ -211,7 +255,11 @@ const PlayerDatabaseModal = ({
               Export
             </button>
             {/* Import Button */}
-            <label className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+            <label className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs ${
+              isAtLimit 
+                ? 'bg-slate-500/30 text-slate-400 cursor-not-allowed' 
+                : 'bg-white/20 hover:bg-white/30 text-white cursor-pointer'
+            }`}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
@@ -221,11 +269,24 @@ const PlayerDatabaseModal = ({
                 accept=".csv"
                 onChange={handleImportCSV}
                 className="hidden"
+                disabled={isAtLimit}
               />
             </label>
             <button onClick={handleClose} className="text-white/80 hover:text-white text-2xl font-light transition-colors ml-1">&times;</button>
           </div>
         </div>
+        
+        {/* Hidden Players Warning */}
+        {hasHiddenPlayers && (
+          <div className="bg-amber-500/20 border-b border-amber-500/30 px-4 py-2 flex items-center gap-2">
+            <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="text-amber-300 text-sm">
+              {totalPlayerCount - maxPlayers} player(s) are hidden due to your license limit of {maxPlayers} players. Upgrade your license to view all players.
+            </span>
+          </div>
+        )}
         
         <div className="p-6 flex-1 overflow-y-auto flex flex-col min-h-0">
           {/* Import/Export Status Messages */}
@@ -306,7 +367,13 @@ const PlayerDatabaseModal = ({
               </select>
               <button
                 onClick={handleAddPlayer}
-                className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-white font-semibold px-4 py-1.5 rounded text-sm transition-all shadow-lg shadow-cyan-500/25"
+                disabled={isAtLimit}
+                className={`font-semibold px-4 py-1.5 rounded text-sm transition-all shadow-lg ${
+                  isAtLimit 
+                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed shadow-none' 
+                    : 'bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-white shadow-cyan-500/25'
+                }`}
+                title={isAtLimit ? `Player limit reached (${maxPlayers})` : 'Add player'}
               >
                 + Add
               </button>

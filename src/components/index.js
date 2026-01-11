@@ -6,3 +6,5 @@ export { default as CourtsPanel } from './CourtsPanel';
 export { default as LevelBadge } from './LevelBadge';
 export { default as GenderIcon } from './GenderIcon';
 export { default as MatchHistoryModal } from './MatchHistoryModal';
+export { default as LicenseEntryModal } from './LicenseEntryModal';
+export { default as AboutModal } from './AboutModal';

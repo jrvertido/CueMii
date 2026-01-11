@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 2.9.10**
+**Version 3.0.1**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,29 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v3.0.1** - Encoded License Keys
+  - License keys are now encoded strings
+  - No format hints shown to users
+  - Simplified license input UI
+
+- **v3.0.0** - Licensing System
+  - Added license key requirement on first app launch
+  - License saved to browser localStorage
+  - About section showing license info with edit capability
+  - License expiration check - app becomes unusable when expired
+  - Player database limit enforced by license
+  - CSV import respects license player limit
+  - Hidden players warning when database exceeds license limit
+
+- **v2.9.12** - Auto-scroll to Returned Match
+  - Match Queue now automatically scrolls to show a match when it's returned from a court
+
+- **v2.9.11** - Match Validation & Returned Match Highlight
+  - Cannot assign a match to court if less than 4 players
+  - Shows "Need 4 players to assign court" message for incomplete matches
+  - Player counter (x/4) shows bold red with "✗" if players > 0 but < 4
+  - Matches returned from courts have pulsating red border for 30 seconds
 
 - **v2.9.10** - Brighter Court Highlight
   - Made court pulsating highlight a brighter yellow color
