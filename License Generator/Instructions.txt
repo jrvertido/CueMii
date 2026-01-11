@@ -1,0 +1,3 @@
+node generate-license.js 2026-12-31 150
+
+# Output: YmFkZGl4eC0yMDI2LTEyLTMxLXAxNTA=
