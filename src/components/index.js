@@ -5,3 +5,4 @@ export { default as MatchQueue } from './MatchQueue';
 export { default as CourtsPanel } from './CourtsPanel';
 export { default as LevelBadge } from './LevelBadge';
 export { default as GenderIcon } from './GenderIcon';
+export { default as MatchHistoryModal } from './MatchHistoryModal';

@@ -1,5 +1,5 @@
 // App Version
-export const APP_VERSION = '1.8.2';
+export const APP_VERSION = '2.9.6';
 
 // Initial player database from baddixx_players.csv
 export const initialPlayers = [

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LevelBadge from './LevelBadge';
 import GenderIcon from './GenderIcon';
+import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
 
 /**
  * Match queue section for creating and managing matches
@@ -16,38 +17,183 @@ const MatchQueue = ({
   smartMatch,
   moveMatchToCourt,
   courts,
-  getAvailablePoolPlayers
+  getAvailablePoolPlayers,
+  addPlayerToMatch,
+  movePlayerBetweenMatches,
+  togglePreferredCourt,
+  clearPreferredCourts,
+  isDarkMode = true,
+  lastSmartMatch,
+  undoSmartMatch,
+  smartQueueAll,
+  lastSmartQueueAll,
+  undoSmartQueueAll,
+  smartMatchedPlayers = {},
+  currentTime,
+  averageWaitTime = 20,
+  reorderMatches
 }) => {
+  const [dragOverMatchId, setDragOverMatchId] = useState(null);
+  const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
+  const [draggingMatchId, setDraggingMatchId] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenCourtDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Format name as "FirstName L."
+  const formatName = (name) => {
+    const parts = name.split(' ');
+    if (parts.length > 1) {
+      return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    }
+    return parts[0];
+  };
+
+  // Check if player was smart matched within the last 3 minutes
+  const isRecentlySmartMatched = (playerId) => {
+    const matchedAt = smartMatchedPlayers[playerId];
+    if (!matchedAt) return false;
+    const threeMinutes = 3 * 60 * 1000;
+    return (currentTime - matchedAt) < threeMinutes;
+  };
+
+  // Drag handlers for player cards in matches
+  const handleDragStart = (e, player, matchId) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      player,
+      sourceType: 'match',
+      sourceMatchId: matchId
+    }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, matchId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverMatchId(matchId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverMatchId(null);
+  };
+
+  const handleDrop = (e, targetMatchId) => {
+    e.preventDefault();
+    setDragOverMatchId(null);
+    
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const targetMatch = matches.find(m => m.id === targetMatchId);
+      
+      if (!targetMatch || targetMatch.players.length >= 4) return;
+      
+      // Check if player is already in target match
+      if (targetMatch.players.some(p => p.id === data.player.id)) return;
+      
+      if (data.sourceType === 'pool') {
+        // From pool to match
+        addPlayerToMatch(targetMatchId, data.player);
+      } else if (data.sourceType === 'match' && data.sourceMatchId !== targetMatchId) {
+        // From one match to another
+        movePlayerBetweenMatches(data.sourceMatchId, targetMatchId, data.player);
+      }
+    } catch (err) {
+      console.error('Drop error:', err);
+    }
+  };
+
+  // Match reorder drag handlers
+  const handleMatchDragStart = (e, matchId) => {
+    e.stopPropagation();
+    e.dataTransfer.setData('matchId', String(matchId));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingMatchId(matchId);
+  };
+
+  const handleMatchDragEnd = () => {
+    setDraggingMatchId(null);
+  };
+
   return (
-    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
-      <div className="bg-gradient-to-r from-orange-600/20 to-red-600/20 border-b border-slate-700/50 px-4 py-3">
+    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
+      isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-300'
+    }`}>
+      <div className={`bg-gradient-to-r border-b px-4 py-3 ${
+        isDarkMode 
+          ? 'from-orange-600/20 to-red-600/20 border-slate-700/50' 
+          : 'from-orange-100 to-red-100 border-slate-300'
+      }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              isDarkMode ? 'bg-orange-500/20' : 'bg-orange-500/30'
+            }`}>
+              <svg className={`w-5 h-5 ${isDarkMode ? 'text-orange-500' : 'text-orange-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Match Queue</h2>
-              <p className="text-slate-400 text-xs">{matches.length} pending</p>
+              <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Match Queue</h2>
+              <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                {matches.length} pending · <span className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}>Avg wait: {averageWaitTime}m</span>
+              </p>
             </div>
           </div>
-          <button
-            onClick={createMatch}
-            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 px-3 py-1.5 rounded-lg font-semibold transition-all shadow-lg shadow-orange-500/25 flex items-center gap-1 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Smart Queue All Button */}
+            <button
+              onClick={smartQueueAll}
+              disabled={getAvailablePoolPlayers().length === 0}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 text-white"
+              title="Smart Match all incomplete matches"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Smart All
+            </button>
+            {/* Undo Smart Queue All Button */}
+            {lastSmartQueueAll && (
+              <button
+                onClick={undoSmartQueueAll}
+                className={`px-1.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-0.5 border ${
+                  isDarkMode 
+                    ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-400' 
+                    : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-700'
+                }`}
+                title={`Undo Smart Queue All (${lastSmartQueueAll.addedPlayers.length} players)`}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                Undo All
+              </button>
+            )}
+            <button
+              onClick={createMatch}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 px-3 py-1.5 rounded-lg font-semibold transition-all shadow-lg shadow-orange-500/25 flex items-center gap-1 text-sm text-white"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create
+            </button>
+          </div>
         </div>
       </div>
       
       <div className="p-2 flex-1 overflow-y-auto custom-scrollbar">
         {matches.length === 0 ? (
-          <div className="text-center py-6 text-slate-500">
+          <div className={`text-center py-6 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
             <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
             </svg>
@@ -55,59 +201,231 @@ const MatchQueue = ({
           </div>
         ) : (
           <div className="space-y-2">
-            {matches.map(match => {
+            {[...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0)).map(match => {
               const isComplete = match.players.length === 4;
+              const isDragOver = dragOverMatchId === match.id && !isComplete;
+              const hasPreferredCourts = match.preferredCourts && match.preferredCourts.length > 0;
+              
+              // Determine background and border colors based on theme
+              let bgClass, borderClass;
+              if (isDragOver) {
+                bgClass = isDarkMode ? 'bg-cyan-900/40' : 'bg-cyan-50';
+                borderClass = isDarkMode ? 'border-cyan-400 shadow-lg shadow-cyan-500/20' : 'border-cyan-500 shadow-md shadow-cyan-500/20';
+              } else if (hasPreferredCourts) {
+                bgClass = isDarkMode ? 'bg-amber-900/30' : 'bg-amber-50/70';
+                borderClass = isDarkMode ? 'border-amber-500/50' : 'border-amber-400';
+              } else {
+                // No special highlight for complete matches - same as incomplete
+                bgClass = isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50';
+                borderClass = isDarkMode ? 'border-slate-700/50' : 'border-slate-300';
+              }
+              
+              // Determine selected border
+              let selectedClass = '';
+              if (selectedMatchId === match.id) {
+                if (hasPreferredCourts) {
+                  selectedClass = isDarkMode ? 'border-amber-400 shadow-lg shadow-amber-500/20' : 'border-amber-500 shadow-md shadow-amber-500/20';
+                } else {
+                  selectedClass = isDarkMode ? 'border-orange-500 shadow-lg shadow-orange-500/10' : 'border-orange-500 shadow-md shadow-orange-500/20';
+                }
+              }
+              
               return (
               <div
                 key={match.id}
-                className={`rounded-lg border transition-all ${
-                  isComplete 
-                    ? 'bg-emerald-900/30 border-emerald-500/50' 
-                    : 'bg-slate-800/50 border-slate-700/50'
-                } ${
-                  selectedMatchId === match.id 
-                    ? isComplete 
-                      ? 'border-emerald-400 shadow-lg shadow-emerald-500/20' 
-                      : 'border-orange-500 shadow-lg shadow-orange-500/10'
-                    : 'hover:border-slate-600'
+                onDragOver={(e) => {
+                  // Handle match reorder drag
+                  if (draggingMatchId && draggingMatchId !== match.id) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  } else {
+                    // Handle player drag
+                    handleDragOver(e, match.id);
+                  }
+                }}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => {
+                  // Check if it's a match reorder drop first
+                  const matchIdData = e.dataTransfer.getData('matchId');
+                  if (matchIdData) {
+                    e.preventDefault();
+                    const draggedMatchId = Number(matchIdData);
+                    if (draggedMatchId && draggedMatchId !== match.id && reorderMatches) {
+                      reorderMatches(draggedMatchId, match.id);
+                    }
+                    setDraggingMatchId(null);
+                  } else {
+                    // Handle player drop
+                    handleDrop(e, match.id);
+                  }
+                }}
+                className={`rounded-lg border transition-all ${bgClass} ${selectedClass || borderClass} ${
+                  selectedMatchId !== match.id ? 'hover:border-slate-600' : ''
+                } ${draggingMatchId === match.id ? 'opacity-50' : ''} ${
+                  draggingMatchId && draggingMatchId !== match.id ? 'border-dashed' : ''
                 }`}
               >
+                {/* Preferred Courts Label */}
+                {match.preferredCourts && match.preferredCourts.length > 0 && (
+                  <div className={`border-b px-2 py-1 flex items-center gap-2 rounded-t-lg ${
+                    isDarkMode 
+                      ? 'bg-amber-500/20 border-amber-500/30' 
+                      : 'bg-amber-100 border-amber-400'
+                  }`}>
+                    <svg className={`w-4 h-4 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                      Waiting for: {match.preferredCourts.map(courtId => 
+                        courts.find(c => c.id === courtId)?.name || 'Unknown'
+                      ).join(', ')}
+                    </span>
+                    <button
+                      onClick={() => clearPreferredCourts(match.id)}
+                      className={`ml-auto text-xs ${isDarkMode ? 'text-amber-400 hover:text-amber-300' : 'text-amber-600 hover:text-amber-800'}`}
+                      title="Clear all preferences"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <div className="p-2">
                   {/* Header Row */}
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {/* Drag Handle */}
+                      <div
+                        draggable
+                        onDragStart={(e) => handleMatchDragStart(e, match.id)}
+                        onDragEnd={handleMatchDragEnd}
+                        className={`cursor-grab active:cursor-grabbing p-0.5 rounded ${
+                          isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'
+                        }`}
+                        title="Drag to reorder"
+                      >
+                        <svg className={`w-4 h-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                        isDarkMode 
+                          ? 'text-orange-300 bg-orange-500/20 border-orange-500/50' 
+                          : 'text-orange-700 bg-orange-100 border-orange-400'
+                      }`}>
+                        #{match.matchNumber || '?'}
+                      </span>
+                      {/* Preferred Courts Multi-Select Dropdown */}
+                      <div className="relative" ref={openCourtDropdown === match.id ? dropdownRef : null}>
+                        <button
+                          onClick={() => setOpenCourtDropdown(openCourtDropdown === match.id ? null : match.id)}
+                          className={`border rounded px-1.5 py-0.5 text-xs focus:outline-none cursor-pointer flex items-center gap-0.5 ${
+                            isDarkMode 
+                              ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-teal-500' 
+                              : 'bg-white border-slate-400 text-slate-700 hover:border-teal-500'
+                          }`}
+                          title="Select preferred courts"
+                        >
+                          <span>Courts ({match.preferredCourts?.length || 0})</span>
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {openCourtDropdown === match.id && (
+                          <div className={`absolute top-full left-0 mt-1 border rounded-lg shadow-xl z-50 min-w-[150px] ${
+                            isDarkMode 
+                              ? 'bg-slate-800 border-slate-600' 
+                              : 'bg-white border-slate-300'
+                          }`}>
+                            {courts.map(court => {
+                              const isSelected = match.preferredCourts?.includes(court.id);
+                              return (
+                                <label
+                                  key={court.id}
+                                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm ${
+                                    isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => togglePreferredCourt(match.id, court.id)}
+                                    className="rounded border-slate-500 bg-slate-700 text-green-500 focus:ring-green-500"
+                                  />
+                                  <span className={
+                                    isSelected 
+                                      ? (isDarkMode ? 'text-green-400' : 'text-green-700 font-medium') 
+                                      : (isDarkMode ? 'text-slate-300' : 'text-slate-700')
+                                  }>
+                                    {court.name}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                            {courts.length === 0 && (
+                              <div className={`px-3 py-2 text-sm ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>No courts available</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => setSelectedMatchId(selectedMatchId === match.id ? null : match.id)}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                           selectedMatchId === match.id
                             ? isComplete 
                               ? 'bg-emerald-500 text-white'
                               : 'bg-orange-500 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            : isDarkMode 
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                              : 'bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300'
                         }`}
                       >
                         {selectedMatchId === match.id ? 'Selected' : 'Select'}
                       </button>
-                      <span className={`text-sm font-medium ${isComplete ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-medium ${
+                        isComplete 
+                          ? (isDarkMode ? 'text-emerald-400' : 'text-emerald-600') 
+                          : (isDarkMode ? 'text-slate-400' : 'text-slate-600')
+                      }`}>
                         {match.players.length}/4 {isComplete && '✓'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => smartMatch(match.id)}
                         disabled={match.players.length >= 4 || getAvailablePoolPlayers().length === 0}
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-3 py-1 rounded text-sm font-medium transition-all flex items-center gap-1"
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-2 py-0.5 rounded text-xs font-medium transition-all flex items-center gap-1 text-white"
                         title="Smart Match"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        Smart Match
+                        Smart
                       </button>
+                      {/* Undo button - shows when this match was last Smart Matched */}
+                      {lastSmartMatch?.matchId === match.id && (
+                        <button
+                          onClick={undoSmartMatch}
+                          className={`px-1.5 py-0.5 rounded text-xs font-medium transition-all flex items-center gap-0.5 border ${
+                            isDarkMode 
+                              ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-400' 
+                              : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-700'
+                          }`}
+                          title={`Undo Smart Match (${lastSmartMatch.addedPlayers.length} players)`}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                          Undo
+                        </button>
+                      )}
                       {match.players.length > 0 && (
                         <button
                           onClick={() => clearMatch(match.id)}
-                          className="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm font-medium transition-colors text-slate-200"
+                          className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                            isDarkMode 
+                              ? 'bg-slate-600 hover:bg-slate-500 text-slate-200' 
+                              : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                          }`}
                           title="Clear all players from match"
                         >
                           Clear
@@ -115,10 +433,10 @@ const MatchQueue = ({
                       )}
                       <button
                         onClick={() => deleteMatch(match.id)}
-                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-colors"
+                        className="text-red-400 hover:text-red-300 p-0.5 rounded hover:bg-red-500/10 transition-colors"
                         title="Delete match"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
@@ -129,52 +447,75 @@ const MatchQueue = ({
                   <div className="flex gap-1 mb-2">
                     {[0, 1, 2, 3].map(index => {
                       const player = match.players[index];
-                      // Format name as "FirstName L."
-                      const formatName = (name) => {
-                        const parts = name.split(' ');
-                        if (parts.length > 1) {
-                          return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-                        }
-                        return parts[0];
-                      };
+                      const isRecentSmart = player && isRecentlySmartMatched(player.id);
                       return (
                         <div
                           key={index}
+                          draggable={!!player}
+                          onDragStart={(e) => player && handleDragStart(e, player, match.id)}
                           className={`flex-1 rounded px-2 py-1.5 border ${
                             player 
-                              ? player.gender === 'male'
-                                ? 'bg-blue-900/60 border-blue-500/50'
-                                : 'bg-pink-900/60 border-pink-500/50'
-                              : 'bg-slate-800/30 border-dashed border-slate-700'
+                              ? isRecentSmart
+                                ? player.gender === 'male'
+                                  ? isDarkMode 
+                                    ? 'bg-blue-900/60 border-amber-400 ring-2 ring-amber-400/70 cursor-grab active:cursor-grabbing'
+                                    : 'bg-blue-100 border-amber-500 ring-2 ring-amber-500/70 cursor-grab active:cursor-grabbing'
+                                  : isDarkMode 
+                                    ? 'bg-pink-900/60 border-amber-400 ring-2 ring-amber-400/70 cursor-grab active:cursor-grabbing'
+                                    : 'bg-pink-100 border-amber-500 ring-2 ring-amber-500/70 cursor-grab active:cursor-grabbing'
+                                : player.gender === 'male'
+                                  ? isDarkMode 
+                                    ? 'bg-blue-900/60 border-blue-500/50 cursor-grab active:cursor-grabbing'
+                                    : 'bg-blue-100 border-blue-400 cursor-grab active:cursor-grabbing'
+                                  : isDarkMode 
+                                    ? 'bg-pink-900/60 border-pink-500/50 cursor-grab active:cursor-grabbing'
+                                    : 'bg-pink-100 border-pink-400 cursor-grab active:cursor-grabbing'
+                              : isDarkMode 
+                                ? 'bg-slate-800/30 border-dashed border-slate-700'
+                                : 'bg-slate-100 border-dashed border-slate-300'
                           }`}
                         >
                           {player ? (
                             <div className="relative group flex items-center justify-between gap-1">
-                              <span className={`truncate font-semibold text-base ${player.gender === 'male' ? 'text-blue-200' : 'text-pink-200'}`} title={player.name}>
+                              <span className={`truncate font-semibold text-base ${
+                                player.gender === 'male' 
+                                  ? (isDarkMode ? 'text-blue-200' : 'text-blue-800') 
+                                  : (isDarkMode ? 'text-pink-200' : 'text-pink-800')
+                              }`} title={player.name}>
                                 {formatName(player.name)}
                               </span>
                               <div className="flex items-center gap-1 text-sm flex-shrink-0">
-                                <span className="text-emerald-400">🎮{player.playCount || 0}</span>
+                                <span className={`${
+                                  isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)
+                                }`} title="Wait time">⏱{formatWaitTime(player.joinedAt)}</span>
+                                <span className={isDarkMode ? 'text-emerald-400' : 'text-emerald-600'} title="Games played">🏸{player.playCount || 0}</span>
                                 <span className={`px-1.5 py-0.5 rounded font-bold text-xs ${
-                                  player.level === 'Expert' ? 'bg-purple-500/50 text-purple-200 border border-purple-400/50' :
-                                  player.level === 'Advanced' ? 'bg-orange-500/50 text-orange-200 border border-orange-400/50' :
-                                  player.level === 'Intermediate' ? 'bg-cyan-500/50 text-cyan-200 border border-cyan-400/50' :
-                                  'bg-green-500/50 text-green-200 border border-green-400/50'
+                                  player.level === 'Expert' 
+                                    ? (isDarkMode ? 'bg-purple-500/50 text-purple-200 border border-purple-400/50' : 'bg-purple-100 text-purple-700 border border-purple-400')
+                                    : player.level === 'Advanced' 
+                                      ? (isDarkMode ? 'bg-orange-500/50 text-orange-200 border border-orange-400/50' : 'bg-orange-100 text-orange-700 border border-orange-400')
+                                      : player.level === 'Intermediate' 
+                                        ? (isDarkMode ? 'bg-cyan-500/50 text-cyan-200 border border-cyan-400/50' : 'bg-cyan-100 text-cyan-700 border border-cyan-400')
+                                        : (isDarkMode ? 'bg-green-500/50 text-green-200 border border-green-400/50' : 'bg-green-100 text-green-700 border border-green-400')
                                 }`}>
                                   {player.level[0]}
                                 </span>
                                 <button
                                   onClick={() => removePlayerFromMatch(match.id, player.id)}
-                                  className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                    isDarkMode 
+                                      ? 'text-red-400 hover:text-red-300 hover:bg-red-500/20' 
+                                      : 'text-red-500 hover:text-red-600 hover:bg-red-100'
+                                  }`}
                                 >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            <div className="text-slate-600 text-base text-center">—</div>
+                            <div className={`text-base text-center ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>—</div>
                           )}
                         </div>
                       );
@@ -182,27 +523,77 @@ const MatchQueue = ({
                   </div>
                   
                   {/* Move to Court - Compact */}
-                  {match.players.length > 0 && (
-                    <div className="flex gap-1">
-                      {courts.filter(c => !c.match).map(court => (
-                        <button
-                          key={court.id}
-                          onClick={() => moveMatchToCourt(match.id, court.id)}
-                          className="flex-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 text-xs py-1 rounded transition-colors flex items-center justify-center gap-0.5"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                          </svg>
-                          {court.name}
-                        </button>
-                      ))}
-                      {courts.filter(c => !c.match).length === 0 && (
-                        <div className="flex-1 text-center text-slate-500 text-xs py-1">
-                          No courts
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {match.players.length > 0 && (() => {
+                    // Get available (empty) courts
+                    const availableCourts = courts.filter(c => !c.match);
+                    
+                    let filteredCourts;
+                    if (hasPreferredCourts) {
+                      // If match has preferences, only show preferred courts that are available
+                      filteredCourts = availableCourts.filter(c => 
+                        match.preferredCourts.includes(c.id)
+                      );
+                    } else {
+                      // If no preferences, exclude courts that lower-numbered matches are waiting for
+                      const courtsWaitedByLowerMatches = new Set();
+                      matches.forEach(m => {
+                        if (m.matchNumber < match.matchNumber && m.preferredCourts && m.preferredCourts.length > 0) {
+                          m.preferredCourts.forEach(courtId => courtsWaitedByLowerMatches.add(courtId));
+                        }
+                      });
+                      filteredCourts = availableCourts.filter(c => 
+                        !courtsWaitedByLowerMatches.has(c.id)
+                      );
+                    }
+                    
+                    // Check which courts are wanted by higher matchID matches
+                    const courtsWaitedByHigherMatches = new Set();
+                    matches.forEach(m => {
+                      if (m.matchNumber > match.matchNumber && m.preferredCourts && m.preferredCourts.length > 0) {
+                        m.preferredCourts.forEach(courtId => courtsWaitedByHigherMatches.add(courtId));
+                      }
+                    });
+                    
+                    return (
+                      <div className="flex gap-1">
+                        {filteredCourts.map(court => {
+                          const isWantedByHigher = courtsWaitedByHigherMatches.has(court.id);
+                          let buttonClass;
+                          if (hasPreferredCourts) {
+                            buttonClass = isDarkMode 
+                              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' 
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400';
+                          } else if (isWantedByHigher) {
+                            buttonClass = isDarkMode 
+                              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' 
+                              : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400';
+                          } else {
+                            buttonClass = isDarkMode 
+                              ? 'bg-green-600/30 hover:bg-green-600/40 text-green-400' 
+                              : 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-500';
+                          }
+                          return (
+                            <button
+                              key={court.id}
+                              onClick={() => moveMatchToCourt(match.id, court.id)}
+                              className={`flex-1 ${buttonClass} text-xs py-1 rounded transition-colors flex items-center justify-center gap-0.5`}
+                              title={isWantedByHigher && !hasPreferredCourts ? 'Other matches are waiting for this court' : ''}
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                              {court.name}
+                            </button>
+                          );
+                        })}
+                        {filteredCourts.length === 0 && (
+                          <div className="flex-1 text-center text-slate-500 text-xs py-1">
+                            {hasPreferredCourts ? 'Preferred courts busy' : 'No courts available'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               );

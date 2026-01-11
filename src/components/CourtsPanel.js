@@ -1,10 +1,8 @@
 import React from 'react';
 import { formatCourtTime } from '../utils/formatters';
-import LevelBadge from './LevelBadge';
-import GenderIcon from './GenderIcon';
 
 /**
- * Courts panel displaying all courts and their current status
+ * Courts panel displaying all courts and their current status - Ultra compact
  */
 const CourtsPanel = ({
   courts,
@@ -18,117 +16,182 @@ const CourtsPanel = ({
   setEditingCourtName,
   renameCourt,
   endMatch,
-  currentTime
+  returnMatchToQueue,
+  currentTime,
+  isDarkMode = true
 }) => {
+  // Format name as "FirstName L."
+  const formatName = (name) => {
+    const parts = name.split(' ');
+    if (parts.length > 1) {
+      return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    }
+    return parts[0];
+  };
+
+  // Get elapsed minutes for a court
+  const getElapsedMinutes = (startTime) => {
+    if (!startTime) return 0;
+    return Math.floor((currentTime - startTime) / 1000 / 60);
+  };
+
+  // Get court status based on elapsed time
+  const getCourtStatus = (startTime) => {
+    const minutes = getElapsedMinutes(startTime);
+    if (minutes >= 35) return 'red';
+    if (minutes >= 20) return 'yellow';
+    return 'normal';
+  };
+
   return (
-    <section className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
-      <div className="bg-gradient-to-r from-emerald-600/20 to-green-600/20 border-b border-slate-700/50 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
+      isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-300'
+    }`}>
+      <div className={`bg-gradient-to-r border-b px-3 py-2 ${
+        isDarkMode 
+          ? 'from-emerald-600/20 to-green-600/20 border-slate-700/50' 
+          : 'from-slate-100 to-slate-200 border-slate-300'
+      }`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-6 h-6 rounded flex items-center justify-center ${
+              isDarkMode ? 'bg-emerald-500/20' : 'bg-slate-300'
+            }`}>
+              <svg className={`w-4 h-4 ${isDarkMode ? 'text-emerald-500' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Courts</h2>
-              <p className="text-slate-400 text-sm">{courts.filter(c => c.match).length}/{courts.length} in use</p>
-            </div>
+            <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Courts</span>
+            <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>({courts.filter(c => c.match).length}/{courts.length})</span>
           </div>
         </div>
         
-        {/* Add Court */}
-        <div className="mt-4 flex gap-2">
+        {/* Add Court - Inline */}
+        <div className="flex gap-1">
           <input
             type="text"
             value={newCourtName}
             onChange={(e) => setNewCourtName(e.target.value)}
-            placeholder="New court name..."
-            className="flex-1 bg-slate-800/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+            placeholder="New court..."
+            className={`flex-1 border rounded px-2 py-1 focus:outline-none transition-colors text-xs ${
+              isDarkMode 
+                ? 'bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500' 
+                : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-emerald-500'
+            }`}
             onKeyPress={(e) => e.key === 'Enter' && addCourt()}
           />
           <button
             onClick={addCourt}
             disabled={!newCourtName.trim()}
-            className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-600 disabled:cursor-not-allowed px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
+            className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-400 disabled:cursor-not-allowed px-2 py-1 rounded font-semibold transition-colors text-xs text-white"
           >
-            Add
+            +
           </button>
         </div>
       </div>
       
-      <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+      <div className="p-1.5 space-y-1.5 flex-1 overflow-y-auto custom-scrollbar">
         {courts.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
-            <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <p>No courts created</p>
-            <p className="text-sm mt-1">Add a court above</p>
+          <div className={`text-center py-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+            <p className="text-xs">No courts</p>
           </div>
         ) : (
-          courts.map(court => (
+          courts.map(court => {
+            const courtStatus = court.match ? getCourtStatus(court.startTime) : 'empty';
+            
+            // Check if court was just assigned (within last 30 seconds)
+            const isNewlyAssigned = court.match && court.startTime && (currentTime - court.startTime) < 30000;
+            
+            // Determine court card styling based on status
+            let cardClass, headerClass, timerClass;
+            if (courtStatus === 'red') {
+              cardClass = isDarkMode ? 'bg-red-900/30 border-red-500/50' : 'bg-red-50 border-red-400';
+              headerClass = isDarkMode ? 'border-red-500/30 bg-red-500/10' : 'border-red-300 bg-red-100/50';
+              timerClass = isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold';
+            } else if (courtStatus === 'yellow') {
+              cardClass = isDarkMode ? 'bg-amber-900/30 border-amber-500/50' : 'bg-amber-50 border-amber-400';
+              headerClass = isDarkMode ? 'border-amber-500/30 bg-amber-500/10' : 'border-amber-300 bg-amber-100/50';
+              timerClass = isDarkMode ? 'text-amber-400' : 'text-amber-600';
+            } else if (court.match) {
+              // Normal status (under 20 min) - green timer
+              cardClass = isDarkMode ? 'bg-slate-800/50 border-slate-600' : 'bg-slate-50 border-slate-300';
+              headerClass = isDarkMode ? 'border-slate-700/30' : 'border-slate-200';
+              timerClass = isDarkMode ? 'text-emerald-400' : 'text-emerald-600';
+            } else {
+              cardClass = isDarkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-300';
+              headerClass = isDarkMode ? 'border-slate-700/30' : 'border-slate-200';
+              timerClass = '';
+            }
+            
+            // Add pulsating highlight for newly assigned courts
+            const newlyAssignedClass = isNewlyAssigned 
+              ? 'ring-2 ring-yellow-400 animate-pulse-border' 
+              : '';
+            
+            return (
             <div
               key={court.id}
-              className={`rounded-xl border overflow-hidden transition-all ${
-                court.match 
-                  ? 'bg-gradient-to-br from-emerald-900/30 to-green-900/30 border-emerald-500/50' 
-                  : 'bg-slate-800/30 border-slate-700/50'
-              }`}
+              className={`rounded border overflow-hidden ${cardClass} ${newlyAssignedClass}`}
             >
-              {/* Court Header */}
-              <div className={`px-4 py-3 flex items-center justify-between ${
-                court.match ? 'bg-emerald-500/10' : 'bg-slate-800/50'
-              }`}>
+              {/* Court Header - Single line */}
+              <div className={`px-2 py-1.5 flex items-center justify-between border-b ${headerClass}`}>
                 {editingCourtId === court.id ? (
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-1 flex-1">
                     <input
                       type="text"
                       value={editingCourtName}
                       onChange={(e) => setEditingCourtName(e.target.value)}
-                      className="flex-1 bg-slate-900 border border-emerald-500 rounded px-2 py-1 text-white text-sm"
+                      className={`flex-1 border rounded px-1 py-0.5 text-xs ${
+                        isDarkMode 
+                          ? 'bg-slate-900 border-emerald-500 text-white' 
+                          : 'bg-white border-emerald-500 text-slate-800'
+                      }`}
                       autoFocus
                       onKeyPress={(e) => e.key === 'Enter' && renameCourt(court.id, editingCourtName)}
                     />
-                    <button
-                      onClick={() => renameCourt(court.id, editingCourtName)}
-                      className="text-emerald-400 hover:text-emerald-300"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      onClick={() => { setEditingCourtId(null); setEditingCourtName(''); }}
-                      className="text-slate-400 hover:text-slate-300"
-                    >
-                      ✕
-                    </button>
+                    <button onClick={() => renameCourt(court.id, editingCourtName)} className={`text-xs ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>✓</button>
+                    <button onClick={() => { setEditingCourtId(null); setEditingCourtName(''); }} className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>✕</button>
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${court.match ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                      <span className="font-semibold text-white">{court.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2 h-2 rounded-full ${
+                        courtStatus === 'red' ? 'bg-red-500' :
+                        courtStatus === 'yellow' ? 'bg-amber-500' :
+                        court.match ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-600' : 'bg-slate-400')
+                      }`} />
+                      <span className={`font-semibold text-sm ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{court.name}</span>
                       {court.match && (
-                        <span className="text-emerald-400 text-sm ml-2">
-                          ⏱ {formatCourtTime(court.startTime, currentTime)}
-                        </span>
+                        <span className={`text-sm font-medium ${timerClass}`}>⏱{formatCourtTime(court.startTime, currentTime)}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
+                      {/* Return button - yellow left arrow */}
+                      {court.match && (
+                        <button
+                          onClick={() => returnMatchToQueue(court.id)}
+                          className={`p-0.5 rounded ${isDarkMode ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/20' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-100'}`}
+                          title="Return to queue"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         onClick={() => { setEditingCourtId(court.id); setEditingCourtName(court.name); }}
-                        className="text-slate-400 hover:text-slate-300 p-1 rounded hover:bg-slate-700/50 transition-colors"
+                        className={`p-0.5 ${isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                       </button>
                       <button
                         onClick={() => deleteCourt(court.id)}
-                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-colors"
+                        className={`p-0.5 ${isDarkMode ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-600'}`}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
                     </div>
@@ -137,53 +200,73 @@ const CourtsPanel = ({
               </div>
               
               {/* Court Content */}
-              <div className="p-4">
-                {court.match ? (
-                  <>
-                    {/* Players on Court */}
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      {court.match.players.map((player) => (
-                        <div
-                          key={player.id}
-                          className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <GenderIcon gender={player.gender} />
-                            <span className={`text-sm truncate ${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>{player.name}</span>
-                          </div>
-                          <div className="mt-1">
-                            <LevelBadge level={player.level} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* End Match Button */}
-                    <button
-                      onClick={() => endMatch(court.id)}
-                      className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-400 hover:to-orange-400 py-2 rounded-lg font-semibold transition-all text-sm flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                      </svg>
-                      End Match
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center py-6">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
-                      <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                    <p className="text-slate-500 text-sm">Court Available</p>
-                    <p className="text-slate-600 text-xs mt-1">Assign a match from the queue</p>
+              {court.match ? (
+                <div className="px-2 pt-1.5 pb-2">
+                  {/* Players - 2x2 with level - no color backgrounds */}
+                  <div className="grid grid-cols-2 gap-1 mb-2">
+                    {court.match.players.map((player) => (
+                      <div
+                        key={player.id}
+                        className={`rounded px-2 py-1 flex items-center justify-between h-7 border ${
+                          isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      >
+                        <span className={`text-sm font-medium truncate ${
+                          player.gender === 'male' 
+                            ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') 
+                            : (isDarkMode ? 'text-pink-300' : 'text-pink-700')
+                        }`}>{formatName(player.name)}</span>
+                        <span className={`text-xs font-bold ml-1 ${
+                          player.level === 'Expert' ? (isDarkMode ? 'text-purple-300' : 'text-purple-600') :
+                          player.level === 'Advanced' ? (isDarkMode ? 'text-orange-300' : 'text-orange-600') :
+                          player.level === 'Intermediate' ? (isDarkMode ? 'text-cyan-300' : 'text-cyan-600') :
+                          (isDarkMode ? 'text-green-300' : 'text-green-600')
+                        }`}>{player.level[0]}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                  
+                  {/* End Match Button - checkmark style like v1.8.2 */}
+                  <button
+                    onClick={() => endMatch(court.id)}
+                    className={`w-full h-6 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                      isDarkMode 
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="px-2 pt-1.5 pb-2">
+                  {/* Empty player slots - same layout as filled */}
+                  <div className="grid grid-cols-2 gap-1 mb-2">
+                    {[0, 1, 2, 3].map((index) => (
+                      <div
+                        key={index}
+                        className={`rounded px-2 py-1 h-7 flex items-center border border-dashed ${
+                          isDarkMode 
+                            ? 'bg-slate-800/30 border-slate-700/50' 
+                            : 'bg-slate-100 border-slate-300'
+                        }`}
+                      >
+                        <span className={`text-sm ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>—</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Placeholder for buttons area - same height */}
+                  <div className="flex items-center justify-center text-slate-500 text-xs h-6">
+                    Available
+                  </div>
+                </div>
+              )}
             </div>
-          ))
+          )})
         )}
       </div>
     </section>

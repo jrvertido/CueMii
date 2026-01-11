@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { SKILL_LEVELS, LEVEL_COLORS } from '../data/initialData';
 import { exportPlayersToCSV, parsePlayersCSV } from '../utils/csvUtils';
 
@@ -16,7 +16,8 @@ const PlayerDatabaseModal = ({
   onAddToPool, 
   onRemoveFromPool,
   onRemoveAllFromPool,
-  poolPlayers, 
+  poolPlayers,
+  notPresentPlayers = [],
   onImportPlayers 
 }) => {
   const [newPlayer, setNewPlayer] = useState({ name: '', gender: 'male', level: 'Intermediate' });
@@ -26,6 +27,15 @@ const PlayerDatabaseModal = ({
   const [importSuccess, setImportSuccess] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [newlyAddedPlayerIds, setNewlyAddedPlayerIds] = useState([]);
+  
+  const playerListRef = useRef(null);
+
+  // Handle modal close - reset newly added players
+  const handleClose = () => {
+    setNewlyAddedPlayerIds([]);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -111,6 +121,18 @@ const PlayerDatabaseModal = ({
   const filteredPlayers = [...players]
     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
+      // Newly added players always appear at the top (in order they were added)
+      const aIsNew = newlyAddedPlayerIds.includes(a.id);
+      const bIsNew = newlyAddedPlayerIds.includes(b.id);
+      
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      if (aIsNew && bIsNew) {
+        // Both are new - sort by order added (most recent first)
+        return newlyAddedPlayerIds.indexOf(a.id) - newlyAddedPlayerIds.indexOf(b.id);
+      }
+      
+      // Normal sorting for non-new players
       let comparison = 0;
       
       if (sortBy === 'name') {
@@ -131,8 +153,16 @@ const PlayerDatabaseModal = ({
 
   const handleAddPlayer = () => {
     if (newPlayer.name.trim()) {
-      onAddPlayer({ ...newPlayer, id: Date.now(), name: newPlayer.name.trim() });
+      const newId = Date.now();
+      onAddPlayer({ ...newPlayer, id: newId, name: newPlayer.name.trim() });
+      setNewlyAddedPlayerIds(prev => [newId, ...prev]);
       setNewPlayer({ name: '', gender: 'male', level: 'Intermediate' });
+      // Scroll to top of player list after a brief delay to allow state update
+      setTimeout(() => {
+        if (playerListRef.current) {
+          playerListRef.current.scrollTop = 0;
+        }
+      }, 50);
     }
   };
 
@@ -143,47 +173,48 @@ const PlayerDatabaseModal = ({
     }
   };
 
-  const isInPool = (playerId) => poolPlayers.some(p => p.id === playerId);
+  const isInPool = (playerId) => poolPlayers.some(p => p.id === playerId) || notPresentPlayers.some(p => p.id === playerId);
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl w-[800px] max-h-[90vh] overflow-hidden shadow-2xl border border-cyan-500/20">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl w-[800px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border border-cyan-500/20">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-white tracking-wide">Player Database Management</h2>
-          <div className="flex items-center gap-3">
+        <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-4 py-2.5 flex justify-between items-center flex-shrink-0">
+          <h2 className="text-lg font-bold text-white tracking-wide">Player Database</h2>
+          <div className="flex items-center gap-2">
             {/* Remove All from Pool Button */}
-            {poolPlayers.length > 0 && (
+            {(poolPlayers.length > 0 || notPresentPlayers.length > 0) && (
               <button
                 onClick={() => {
-                  if (window.confirm(`Remove all ${poolPlayers.length} players from the pool?`)) {
+                  const totalCount = poolPlayers.length + notPresentPlayers.length;
+                  if (window.confirm(`Remove all ${totalCount} players from the pool?`)) {
                     onRemoveAllFromPool();
                   }
                 }}
-                className="bg-red-500/30 hover:bg-red-500/50 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm"
+                className="bg-red-500/30 hover:bg-red-500/50 text-white px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                Clear Pool ({poolPlayers.length})
+                Clear Pool ({poolPlayers.length + notPresentPlayers.length})
               </button>
             )}
             {/* Export Button */}
             <button
               onClick={handleExportCSV}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm"
+              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Export CSV
+              Export
             </button>
             {/* Import Button */}
-            <label className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 text-sm cursor-pointer">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <label className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              Import CSV
+              Import
               <input
                 type="file"
                 accept=".csv"
@@ -191,11 +222,11 @@ const PlayerDatabaseModal = ({
                 className="hidden"
               />
             </label>
-            <button onClick={onClose} className="text-white/80 hover:text-white text-3xl font-light transition-colors">&times;</button>
+            <button onClick={handleClose} className="text-white/80 hover:text-white text-2xl font-light transition-colors ml-1">&times;</button>
           </div>
         </div>
         
-        <div className="p-6">
+        <div className="p-6 flex-1 overflow-y-auto flex flex-col min-h-0">
           {/* Import/Export Status Messages */}
           {(importError || importSuccess) && (
             <div className="mb-4 flex gap-3">
@@ -244,49 +275,39 @@ const PlayerDatabaseModal = ({
             </div>
           </div>
 
-          {/* Add New Player Section */}
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-6 border border-slate-700">
-            <h3 className="text-cyan-400 font-semibold mb-3 text-sm uppercase tracking-wider">Add New Player</h3>
-            <div className="flex gap-3 items-end">
-              <div className="flex-1">
-                <label className="text-slate-400 text-xs block mb-1">Name</label>
-                <input
-                  type="text"
-                  value={newPlayer.name}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                  placeholder="Enter player name"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs block mb-1">Gender</label>
-                <select
-                  value={newPlayer.gender}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, gender: e.target.value })}
-                  className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none transition-colors"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs block mb-1">Level</label>
-                <select
-                  value={newPlayer.level}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, level: e.target.value })}
-                  className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none transition-colors"
-                >
-                  {SKILL_LEVELS.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-              </div>
+          {/* Add New Player Section - Compact */}
+          <div className="bg-slate-800/50 rounded-lg p-3 mb-4 border border-slate-700">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={newPlayer.name}
+                onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
+                placeholder="New player name..."
+                className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
+              />
+              <select
+                value={newPlayer.gender}
+                onChange={(e) => setNewPlayer({ ...newPlayer, gender: e.target.value })}
+                className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:border-cyan-500 focus:outline-none transition-colors"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+              <select
+                value={newPlayer.level}
+                onChange={(e) => setNewPlayer({ ...newPlayer, level: e.target.value })}
+                className="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:border-cyan-500 focus:outline-none transition-colors"
+              >
+                {SKILL_LEVELS.map(level => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
               <button
                 onClick={handleAddPlayer}
-                className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-white font-semibold px-6 py-2 rounded-lg transition-all shadow-lg shadow-cyan-500/25"
+                className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-white font-semibold px-4 py-1.5 rounded text-sm transition-all shadow-lg shadow-cyan-500/25"
               >
-                Add
+                + Add
               </button>
             </div>
           </div>
@@ -303,7 +324,7 @@ const PlayerDatabaseModal = ({
           </div>
 
           {/* Player List */}
-          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+          <div ref={playerListRef} className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
             <table className="w-full">
               <thead className="sticky top-0 bg-slate-800">
                 <tr className="text-left text-slate-400 text-sm uppercase tracking-wider">
@@ -336,8 +357,17 @@ const PlayerDatabaseModal = ({
                 </tr>
               </thead>
               <tbody>
-                {filteredPlayers.map(player => (
-                  <tr key={player.id} className="border-t border-slate-700/50 hover:bg-slate-800/50 transition-colors">
+                {filteredPlayers.map(player => {
+                  const isNewlyAdded = newlyAddedPlayerIds.includes(player.id);
+                  return (
+                  <tr 
+                    key={player.id} 
+                    className={`border-t border-slate-700/50 transition-colors ${
+                      isNewlyAdded 
+                        ? 'bg-yellow-500/20 hover:bg-yellow-500/30' 
+                        : 'hover:bg-slate-800/50'
+                    }`}
+                  >
                     {editingPlayer?.id === player.id ? (
                       <>
                         <td className="py-3 px-2">
@@ -403,16 +433,16 @@ const PlayerDatabaseModal = ({
                           {!isInPool(player.id) ? (
                             <button
                               onClick={() => onAddToPool(player)}
-                              className="text-cyan-400 hover:text-cyan-300 text-sm"
+                              className="bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-400 hover:text-cyan-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-cyan-500/30 transition-all"
                             >
-                              Add to Pool
+                              + Add to Pool
                             </button>
                           ) : (
                             <button
                               onClick={() => onRemoveFromPool(player.id)}
-                              className="text-orange-400 hover:text-orange-300 text-sm"
+                              className="bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 hover:text-orange-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-orange-500/30 transition-all"
                             >
-                              Remove from Pool
+                              − Remove
                             </button>
                           )}
                           <button
@@ -431,7 +461,8 @@ const PlayerDatabaseModal = ({
                       </>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {filteredPlayers.length === 0 && (
