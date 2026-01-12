@@ -173,8 +173,8 @@ const PlayerPool = ({
       onDragStart={(e) => handleDragStart(e, player, 'notPresent')}
       className={`group rounded-lg p-2 border transition-all cursor-grab active:cursor-grabbing ${
         isDarkMode 
-          ? 'bg-slate-800/30 border-slate-700/50 hover:border-slate-500/50' 
-          : 'bg-slate-50 border-slate-300 hover:border-slate-400 shadow-sm'
+          ? 'bg-slate-800/30 border-red-500/30 hover:border-red-500/50' 
+          : 'bg-red-50/30 border-red-300/50 hover:border-red-400 shadow-sm'
       }`}
     >
       <div className="flex items-center justify-between mb-1">
@@ -357,9 +357,9 @@ const PlayerPool = ({
               <div className={`flex items-center gap-2 mb-2 pt-2 border-t ${
                 isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
               }`}>
-                <div className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-slate-500' : 'bg-slate-400'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-red-500' : 'bg-red-400'}`}></div>
                 <h3 className={`text-sm font-semibold uppercase tracking-wider ${
-                  isDarkMode ? 'text-slate-500' : 'text-slate-500'
+                  isDarkMode ? 'text-red-400' : 'text-red-500'
                 }`}>
                   Not Present ({filteredNotPresent.length})
                 </h3>

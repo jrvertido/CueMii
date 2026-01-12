@@ -57,6 +57,7 @@ function App() {
   const [smartMatchedPlayers, setSmartMatchedPlayers] = useState({}); // Track when players were smart matched: { playerId: timestamp }
   const [removedWhileOnCourt, setRemovedWhileOnCourt] = useState(new Set()); // Track players removed while on court
   const [returnedMatches, setReturnedMatches] = useState({}); // Track when matches were returned from court: { matchId: timestamp }
+  const [highlightedPriorityMatches, setHighlightedPriorityMatches] = useState({}); // Track matches highlighted for priority: { matchId: timestamp }
   
   const currentTime = useCurrentTime();
 
@@ -415,21 +416,27 @@ function App() {
   // Swap players between two adjacent matches
   const swapMatchPlayers = (matchId, direction) => {
     setMatches(prev => {
-      const matchIndex = prev.findIndex(m => m.id === matchId);
-      if (matchIndex === -1) return prev;
+      // Sort by matchNumber to get correct order
+      const sortedMatches = [...prev].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+      const sortedIndex = sortedMatches.findIndex(m => m.id === matchId);
+      if (sortedIndex === -1) return prev;
       
-      const targetIndex = direction === 'up' ? matchIndex - 1 : matchIndex + 1;
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const targetSortedIndex = direction === 'up' ? sortedIndex - 1 : sortedIndex + 1;
+      if (targetSortedIndex < 0 || targetSortedIndex >= sortedMatches.length) return prev;
       
-      const newMatches = [...prev];
-      const currentPlayers = newMatches[matchIndex].players;
-      const targetPlayers = newMatches[targetIndex].players;
+      const currentMatch = sortedMatches[sortedIndex];
+      const targetMatch = sortedMatches[targetSortedIndex];
       
-      // Swap players
-      newMatches[matchIndex] = { ...newMatches[matchIndex], players: targetPlayers };
-      newMatches[targetIndex] = { ...newMatches[targetIndex], players: currentPlayers };
-      
-      return newMatches;
+      // Swap players between the two matches
+      return prev.map(m => {
+        if (m.id === currentMatch.id) {
+          return { ...m, players: targetMatch.players };
+        }
+        if (m.id === targetMatch.id) {
+          return { ...m, players: currentMatch.players };
+        }
+        return m;
+      });
     });
   };
 
@@ -1281,7 +1288,16 @@ function App() {
           `${eligibleInfo}\n\n` +
           `Do you want to skip them and assign Match #${matchToMove.matchNumber} instead?`
         );
-        if (!confirmed) return;
+        if (!confirmed) {
+          // Highlight eligible matches for 10 seconds
+          const now = Date.now();
+          const highlightedIds = {};
+          eligibleLowerMatches.forEach(m => {
+            highlightedIds[m.id] = now;
+          });
+          setHighlightedPriorityMatches(prev => ({ ...prev, ...highlightedIds }));
+          return;
+        }
       }
     }
     
@@ -1568,6 +1584,7 @@ function App() {
               clearAllMatches={clearAllMatches}
               swapMatchPlayers={swapMatchPlayers}
               returnedMatches={returnedMatches}
+              highlightedPriorityMatches={highlightedPriorityMatches}
             />
           </div>
 

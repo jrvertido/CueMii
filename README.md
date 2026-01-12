@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 3.0.1**
+**Version 3.0.2**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,15 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v3.0.2** - Bug Fixes & UI Improvements
+  - Fixed bug with up/down arrows not working correctly for returned matches
+  - Not Present players now have subtle red border
+  - "Not Present" text is now red
+  - Added floating Up arrow button when Match Queue is scrolled
+  - High Priority Match warning now scrolls to top and highlights eligible matches with pulsating green border for 10 seconds when cancelled
+  - Average wait time shows "1h+" when over 60 minutes
+  - Duplicate player names are no longer allowed in database
 
 - **v3.0.1** - Encoded License Keys
   - License keys are now encoded strings

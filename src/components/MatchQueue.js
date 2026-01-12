@@ -33,14 +33,53 @@ const MatchQueue = ({
   averageWaitTime = 20,
   clearAllMatches,
   swapMatchPlayers,
-  returnedMatches = {}
+  returnedMatches = {},
+  highlightedPriorityMatches = {}
 }) => {
   const [dragOverMatchId, setDragOverMatchId] = useState(null);
   const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const dropdownRef = useRef(null);
   const matchRefs = useRef({});
   const scrollContainerRef = useRef(null);
+  const matchListRef = useRef(null);
   const [lastScrolledMatchId, setLastScrolledMatchId] = useState(null);
+
+  // Handle scroll to show/hide scroll-to-top button
+  useEffect(() => {
+    const container = matchListRef.current;
+    if (!container) return;
+    
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 100);
+    };
+    
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    if (matchListRef.current) {
+      matchListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Scroll to top when priority matches are highlighted
+  useEffect(() => {
+    const highlightedEntries = Object.entries(highlightedPriorityMatches);
+    if (highlightedEntries.length === 0) return;
+    
+    // Sort by timestamp descending to get most recent
+    const mostRecent = highlightedEntries.sort((a, b) => b[1] - a[1])[0];
+    const [, timestamp] = mostRecent;
+    
+    // Only scroll if this is a new highlight (within last 500ms)
+    const isRecent = Date.now() - timestamp < 500;
+    if (isRecent) {
+      scrollToTop();
+    }
+  }, [highlightedPriorityMatches]);
 
   // Scroll to recently returned match
   useEffect(() => {
@@ -154,7 +193,7 @@ const MatchQueue = ({
             <div>
               <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Match Queue</h2>
               <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {matches.length} pending · <span className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}>Avg wait: {averageWaitTime}m</span>
+                {matches.length} pending · <span className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}>Avg wait: {averageWaitTime >= 60 ? '1h+' : `${averageWaitTime}m`}</span>
               </p>
             </div>
           </div>
@@ -223,7 +262,24 @@ const MatchQueue = ({
         </div>
       </div>
       
-      <div className="p-2 flex-1 overflow-y-auto custom-scrollbar">
+      <div ref={matchListRef} className="p-2 flex-1 overflow-y-auto custom-scrollbar relative">
+        {/* Floating Scroll to Top Button */}
+        {showScrollToTop && (
+          <button
+            onClick={scrollToTop}
+            className={`sticky top-0 left-1/2 -translate-x-1/2 z-10 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center ${
+              isDarkMode 
+                ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-black/30' 
+                : 'bg-white hover:bg-slate-100 text-slate-700 shadow-slate-300/50 border border-slate-200'
+            }`}
+            title="Scroll to top"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+        )}
+        
         {matches.length === 0 ? (
           <div className={`text-center py-6 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
             <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,11 +303,18 @@ const MatchQueue = ({
               const returnedTime = returnedMatches[match.id];
               const isRecentlyReturned = returnedTime && (Date.now() - returnedTime) < 30000;
               
+              // Check if match is highlighted as priority (within 10 seconds)
+              const priorityTime = highlightedPriorityMatches[match.id];
+              const isHighlightedPriority = priorityTime && (Date.now() - priorityTime) < 10000;
+              
               // Determine background and border colors based on theme
               let bgClass, borderClass;
               if (isDragOver) {
                 bgClass = isDarkMode ? 'bg-cyan-900/40' : 'bg-cyan-50';
                 borderClass = isDarkMode ? 'border-cyan-400 shadow-lg shadow-cyan-500/20' : 'border-cyan-500 shadow-md shadow-cyan-500/20';
+              } else if (isHighlightedPriority) {
+                bgClass = isDarkMode ? 'bg-emerald-900/30' : 'bg-emerald-50/70';
+                borderClass = 'border-emerald-500 animate-pulse-priority';
               } else if (isRecentlyReturned) {
                 bgClass = isDarkMode ? 'bg-red-900/30' : 'bg-red-50/70';
                 borderClass = 'border-red-500 animate-pulse-returned';

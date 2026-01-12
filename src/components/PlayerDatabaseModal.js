@@ -183,6 +183,14 @@ const PlayerDatabaseModal = ({
     }
     
     if (newPlayer.name.trim()) {
+      // Check for duplicate name
+      const trimmedName = newPlayer.name.trim().toLowerCase();
+      const isDuplicate = players.some(p => p.name.toLowerCase() === trimmedName);
+      if (isDuplicate) {
+        alert(`A player named "${newPlayer.name.trim()}" already exists in the database.\n\nPlease use a unique name.`);
+        return;
+      }
+      
       const newId = Date.now();
       onAddPlayer({ ...newPlayer, id: newId, name: newPlayer.name.trim() });
       setNewlyAddedPlayerIds(prev => [newId, ...prev]);
@@ -198,6 +206,14 @@ const PlayerDatabaseModal = ({
 
   const handleSaveEdit = () => {
     if (editingPlayer && editingPlayer.name.trim()) {
+      // Check for duplicate name (excluding the current player)
+      const trimmedName = editingPlayer.name.trim().toLowerCase();
+      const isDuplicate = players.some(p => p.id !== editingPlayer.id && p.name.toLowerCase() === trimmedName);
+      if (isDuplicate) {
+        alert(`A player named "${editingPlayer.name.trim()}" already exists in the database.\n\nPlease use a unique name.`);
+        return;
+      }
+      
       onEditPlayer(editingPlayer);
       setEditingPlayer(null);
     }
