@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 3.0.2**
+**Version 3.3.5**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,173 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v3.3.5** - Return Button Size Adjustment
+  - Changed: Return to Queue button is now 1/4 width (icon only), Done button takes remaining space
+
+- **v3.3.4** - Reports Graphs & UI Improvements
+  - Added: Daily charts in Overall Reports showing Unique Players, Total Matches, and Avg Wait Time per day
+  - Changed: Moved "Return to Queue" button next to "Done" button in courts
+  - Fixed: Returning match from court to queue no longer creates unnecessary new match
+  - Changed: Minimum average wait time now 15 minutes (was 20)
+  - Changed: "Clear All Timers" now also resets average wait time to 15 minutes
+
+- **v3.3.3** - Repeat Pairings Warning
+  - Added: "REPEAT PAIRINGS" warning when a player being added/moved has played with existing match players 3+ times
+  - Shows list of players and how many times they've played together
+
+- **v3.3.2** - Move Player Warning
+  - Added: Novice over-matching warnings now also apply when moving players between matches
+
+- **v3.3.1** - Warning Header Update
+  - Changed: Novice warning dialogs now show "⚠️ NOVICE OVER-MATCHING ⚠️" as the header
+
+- **v3.3.0** - Novice Pairing Warnings
+  - Added: When adding a novice player, warns if any existing players in match have played with 2+ novices
+  - Added: When adding a non-novice player to a match with novices, warns if that player has played with 2+ novices already
+
+- **v3.2.9** - Removed Manual Selection Warnings
+  - Removed: Repeat Pairings warning
+  - Removed: Played with Novice >2 times warning
+  - Removed: Players with 2+ novices warning
+
+- **v3.2.8** - Manual Selection Warning Enhancement
+  - Added: Warning when selecting players showing if any players already in the match have played with 2+ unique novices
+  - Shows which novice players they have played with
+
+- **v3.2.7** - Reports Time Tracking Clarification
+  - Fixed: Player Statistics time columns (<20m, 20-30, 30-40, >40m) now correctly track wait time (time in pool before getting on court)
+  - Added: Court Timer Duration section showing match duration distribution with counts for <20m, 20-30m, 30-40m, >40m ranges
+  - Added: Average court duration display in the section header
+
+- **v3.2.6** - Overall Report Enhancements
+  - Added: Gender breakdown showing Male/Female player counts
+  - Added: Level breakdown showing Expert/Advanced/Intermediate/Novice player counts
+  - Fixed: Player Statistics time columns (<20m, 20-30, 30-40, >40m) now track match duration (time on court) instead of wait time
+
+- **v3.2.5** - Advanced-Novice 3-Match Cooldown Fix
+  - Fixed: Advanced-Novice 3-match cooldown now works correctly
+  - Previously checked `lastNoviceMatchAt > 0` which failed when first novice match was at playCount=0
+  - Now uses `pairedNovices.length > 0` to detect if player has ever matched with novice
+  - Same fix applied to Novice-Advanced cooldown check
+
+- **v3.2.4** - Bug Fixes
+  - Fixed: Player names in Individual Report match lists now colored blue/pink based on gender
+  - Fixed: Intermediate-Novice 2-in-a-row restriction now works correctly (was allowing consecutive novice matches)
+  - Fixed: Wait time of 0 minutes now correctly counted in <20m column (was being excluded)
+
+- **v3.2.3** - Smart Match Fixes & Intermediate-Novice Rules
+  - Fixed: Smart match player tracking now stored directly on matches (not lost when players leave)
+  - Fixed: Advanced-Novice 3-match cooldown now works correctly
+  - Added: Intermediate-Novice restrictions:
+    - Cannot match with any novice more than twice total
+    - Cannot match with the same novice twice
+    - Cannot match with novice 2 times in a row
+  - Added: Manual selection alerts:
+    - Warns if adding player who has played with match players 2+ times
+    - Warns if player has played with any novice more than 2 times
+
+- **v3.2.2** - Reports Enhancements
+  - Player Statistics table: added wait time columns (<20m, 20-30m, 30-40m, >40m) with color coding
+  - Level Combinations: now color coded (Expert=purple, Advanced=orange, Intermediate=blue, Novice=green)
+
+- **v3.2.1** - Simplified Match Queue Slots
+  - Reverted to simple minimum of 7 match slots
+  - Auto-creates a new match whenever the last match has at least 1 player assigned
+  - Removed complex dynamic formula that was causing issues
+
+- **v3.2.0** - Dynamic Queue Slots Race Condition Fix
+  - Fixed race condition causing extra matches when assigning to courts or clicking Done
+  - Added debounce (150ms) to let state settle before calculating minimum slots
+  - Added re-entrancy guard to prevent multiple concurrent match creations
+  - Uses matches.length instead of full matches array for more stable dependency tracking
+
+- **v3.1.9** - Dynamic Queue Slots Fix
+  - Fixed: Match queue slots now correctly count players on courts when calculating minimum slots
+  - Previously only counted players in pool + matches, now includes players actively playing on courts
+
+- **v3.1.8** - Reports Level Display Updates
+  - Individual Reports: level badge now appears before the player name in the sidebar
+  - Player Statistics table: level badge removed from name, added as separate sortable column
+
+- **v3.1.7** - Level Badges & Dynamic Queue Slots
+  - Player Statistics table: level badge (E/A/I/N) now shown next to player names
+  - Individual Reports: level badge shown next to player names in the left sidebar
+  - Match Queue slots: minimum now calculated as ceil((totalPlayers/4) - totalCourts + 2) instead of fixed 7
+
+- **v3.1.6** - Reports Enhancements
+  - Player Statistics table: all columns now sortable (click header to sort)
+  - Overall Report: added average wait time to summary stats
+  - Overall Report: added Wait Time Distribution section (<20m, 20-30m, 30-40m, >40m)
+  - Overall Report: Daily Statistics now shows for selected date (not hidden)
+  - Individual Player: added max wait time to daily statistics
+  - Individual Player: added Activity Timeline graph showing playing vs waiting periods
+
+- **v3.1.5** - PDF Export Always Light Mode
+  - PDF exports now always render in light mode regardless of app theme
+  - Dark mode classes are converted to light mode equivalents when exporting
+  - Produces clean, readable PDFs with white backgrounds and dark text
+
+- **v3.1.4** - PDF Export Using Browser Print
+  - Switched to browser's native print function for PDF export (better text rendering)
+  - PDF export now opens print dialog - select "Save as PDF" to save
+  - Full report content is captured with proper text positioning
+  - Selected player in Match Reports uses level color with yellow border
+
+- **v3.1.3** - PDF Export Improvements & Player Highlight Fix
+  - PDF export now captures full report content (not just visible area)
+  - PDF export expands all scrollable sections for complete capture
+  - Selected player in Match Reports now uses level color with yellow border (instead of purple)
+
+- **v3.1.2** - Reports Color Updates & PDF Export
+  - Updated level colors in reports: Expert=purple, Advanced=orange, Intermediate=blue, Novice=green
+  - Smart Match Usage by Player now shows player level identifier
+  - Added PDF export for Overall Reports
+  - Added PDF export for Individual Player Reports
+  - Gender Combinations section now shows blue for male, pink for female in labels
+  - Individual Player Gender Combinations uses blue/pink gender colors
+
+- **v3.1.1** - Reports Enhancements & Match History Improvements
+  - Match History now shows both start and end times for completed matches
+  - Reports: Date filter now applies to Individual Player stats
+  - Reports: Player list only shows players with data for selected date
+  - Reports: Daily reports only show for selected date when filtered
+  - Reports: Individual Player Daily Reports show player levels with colors
+  - Reports: Daily reports show start and end times for each match
+  - Reports: Added player statistics table when specific date is selected (check-in time, games, smart/manual matches, level breakdown)
+  - Reports: Smart Match Usage by Player now colors names by gender (blue/pink)
+  - Reports: People Played With section now colors names by gender (blue/pink)
+  - Reports: Played with Levels section uses consistent level colors
+
+- **v3.1.0** - Reports Section
+  - Added Reports button in header
+  - Reports modal with date filtering (all time or specific date)
+  - Clear all reports button
+  - Overall Reports tab:
+    - Summary stats (total matches, unique players, smart matches used)
+    - Gender combinations count (e.g., 4M/0F, 2M/2F)
+    - Level combinations count
+    - Daily statistics (games per day, players with X games that day)
+    - Smart Match usage per player
+  - Individual Player Reports tab:
+    - Player selection list with search
+    - Overall statistics:
+      - Total games, average wait time, smart match count
+      - Times played with each level
+      - Gender combinations played
+      - People played with and frequency
+    - Daily reports:
+      - Matches played each day
+      - Wait times between matches
+      - Smart match usage per day
+
+- **v3.0.3** - UI Improvements & Smart Match Algorithm v23
+  - Made floating Up arrow in Match Queue more visible (larger, colorful, bouncing animation)
+  - Average wait time color coding: green (20-30m), yellow (30-40m), red (40m+)
+  - Smart Match Algorithm v23:
+    - Increased mixed doubles rate from 30% to 40%
+    - Expert players now only do Regular Doubles unless match already has mixed genders
+    - If longest-waiting player is an Expert, forces Regular Doubles for that match
 
 - **v3.0.2** - Bug Fixes & UI Improvements
   - Fixed bug with up/down arrows not working correctly for returned matches

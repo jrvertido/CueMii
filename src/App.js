@@ -10,7 +10,8 @@ import {
   CourtsPanel,
   MatchHistoryModal,
   LicenseEntryModal,
-  AboutModal
+  AboutModal,
+  ReportsModal
 } from './components';
 import { 
   validateLicense, 
@@ -46,6 +47,7 @@ function App() {
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [poolLevelFilter, setPoolLevelFilter] = useState('All');
   const [selectedMatchId, setSelectedMatchId] = useState(null);
@@ -114,18 +116,20 @@ function App() {
     return players.slice(0, licenseInfo.maxPlayers);
   };
 
-  // Calculate average wait time (minimum 20 minutes)
+  // Calculate average wait time (minimum 15 minutes)
   const averageWaitTime = React.useMemo(() => {
-    if (waitTimeHistory.length === 0) return 20;
+    if (waitTimeHistory.length === 0) return 15;
     const sum = waitTimeHistory.reduce((acc, time) => acc + time, 0);
     const avg = Math.round(sum / waitTimeHistory.length);
-    return Math.max(20, avg);
+    return Math.max(15, avg);
   }, [waitTimeHistory]);
 
-  // ==================== Auto-Create Matches (minimum 7) ====================
+  // ==================== Auto-Create Matches (minimum 7 + auto-expand) ====================
   
   useEffect(() => {
     const MIN_MATCHES = 7;
+    
+    // Ensure minimum of 7 matches
     if (matches.length < MIN_MATCHES) {
       const matchesToCreate = MIN_MATCHES - matches.length;
       const newMatches = [];
@@ -133,7 +137,7 @@ function App() {
       
       for (let i = 0; i < matchesToCreate; i++) {
         newMatches.push({
-          id: `match_${Date.now()}_${i}`,
+          id: `match_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
           matchNumber: currentMatchNumber,
           players: [],
           createdAt: Date.now()
@@ -143,8 +147,22 @@ function App() {
       
       setMatches(prev => [...prev, ...newMatches]);
       setNextMatchNumber(currentMatchNumber);
+      return;
     }
-  }, [matches.length]);
+    
+    // If last match has at least 1 player, create a new empty match
+    const lastMatch = matches[matches.length - 1];
+    if (lastMatch && lastMatch.players && lastMatch.players.length > 0) {
+      const newMatch = {
+        id: `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        matchNumber: nextMatchNumber,
+        players: [],
+        createdAt: Date.now()
+      };
+      setMatches(prev => [...prev, newMatch]);
+      setNextMatchNumber(prev => prev + 1);
+    }
+  }, [matches]);
 
   // ==================== Reset Function ====================
   
@@ -185,6 +203,8 @@ function App() {
         joinedAt: now
       }))
     })));
+    // Also reset wait time history to reset average wait time to 15 minutes
+    setWaitTimeHistory([]);
   };
 
   // ==================== Clear Match History ====================
@@ -236,7 +256,11 @@ function App() {
       lastNoviceMatchAt: 0, // playCount when Advanced last matched with a Novice
       lastAdvancedMatchAt: 0, // playCount when Novice last matched with an Advanced
       pairedNovices: [], // Track which novices this Advanced player has paired with
-      pairedAdvanced: [] // Track which advanced players this Novice has paired with
+      pairedAdvanced: [], // Track which advanced players this Novice has paired with
+      // Intermediate-Novice tracking
+      intermediateNoviceCount: 0, // Total times Intermediate matched with any Novice
+      lastIntermediateNoviceMatchAt: 0, // playCount when Intermediate last matched with Novice
+      pairedNovicesAsIntermediate: [] // Track which novices this Intermediate has paired with
     }]);
   };
 
@@ -356,6 +380,100 @@ function App() {
   };
 
   const addPlayerToMatch = (matchId, player) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.players.length >= 4 || match.players.find(p => p.id === player.id)) {
+      return;
+    }
+    
+    // Helper to count how many times a player has played with novices
+    const countNovicePlays = (playerId) => {
+      let count = 0;
+      matchHistory.forEach(m => {
+        const playerIds = m.players.map(mp => mp.id);
+        if (playerIds.includes(playerId)) {
+          m.players.forEach(mp => {
+            if (mp.level === 'Novice' && mp.id !== playerId) {
+              count++;
+            }
+          });
+        }
+      });
+      return count;
+    };
+    
+    // Helper to count how many times two players have played together
+    const countTimesPlayedTogether = (playerId1, playerId2) => {
+      return matchHistory.filter(m => {
+        const playerIds = m.players.map(p => p.id);
+        return playerIds.includes(playerId1) && playerIds.includes(playerId2);
+      }).length;
+    };
+    
+    let noviceAlertMessages = [];
+    let repeatAlertMessages = [];
+    
+    // Case 1: Novice player being added - check if existing players have played with 2+ novices
+    if (player.level === 'Novice') {
+      const playersWithHighNoviceCount = [];
+      match.players.forEach(existingPlayer => {
+        if (existingPlayer.level === 'Novice') return; // Skip novice players
+        const novicePlayCount = countNovicePlays(existingPlayer.id);
+        if (novicePlayCount >= 2) {
+          playersWithHighNoviceCount.push({ name: existingPlayer.name, count: novicePlayCount });
+        }
+      });
+      
+      if (playersWithHighNoviceCount.length > 0) {
+        const playersList = playersWithHighNoviceCount
+          .map(p => `• ${p.name}: ${p.count} times`)
+          .join('\n');
+        noviceAlertMessages.push(`Players in match who have played with novices 2+ times:\n${playersList}`);
+      }
+    }
+    
+    // Case 2: Non-novice player being added - check if match has novices and if player has played with 2+ novices
+    if (player.level !== 'Novice') {
+      const hasNoviceInMatch = match.players.some(p => p.level === 'Novice');
+      if (hasNoviceInMatch) {
+        const playerNoviceCount = countNovicePlays(player.id);
+        if (playerNoviceCount >= 2) {
+          noviceAlertMessages.push(`${player.name} has already played with novices ${playerNoviceCount} times`);
+        }
+      }
+    }
+    
+    // Check for repeat pairings (3+ times)
+    const repeatPairings = [];
+    match.players.forEach(existingPlayer => {
+      const timesPlayed = countTimesPlayedTogether(player.id, existingPlayer.id);
+      if (timesPlayed >= 3) {
+        repeatPairings.push({ name: existingPlayer.name, count: timesPlayed });
+      }
+    });
+    
+    if (repeatPairings.length > 0) {
+      const playersList = repeatPairings
+        .map(p => `• ${p.name}: ${p.count} times`)
+        .join('\n');
+      repeatAlertMessages.push(`${player.name} has played with these players 3+ times:\n${playersList}`);
+    }
+    
+    // Show novice alert if any issues detected
+    if (noviceAlertMessages.length > 0) {
+      const proceed = window.confirm(
+        `⚠️ NOVICE OVER-MATCHING ⚠️\n\n${noviceAlertMessages.join('\n\n')}\n\nDo you still want to add ${player.name} to this match?`
+      );
+      if (!proceed) return;
+    }
+    
+    // Show repeat pairings alert if any issues detected
+    if (repeatAlertMessages.length > 0) {
+      const proceed = window.confirm(
+        `⚠️ REPEAT PAIRINGS ⚠️\n\n${repeatAlertMessages.join('\n\n')}\n\nDo you still want to add ${player.name} to this match?`
+      );
+      if (!proceed) return;
+    }
+    
     setMatches(prev => {
       const updatedMatches = prev.map(m => {
         if (m.id === matchId && m.players.length < 4 && !m.players.find(p => p.id === player.id)) {
@@ -378,6 +496,100 @@ function App() {
   };
 
   const movePlayerBetweenMatches = (sourceMatchId, targetMatchId, player) => {
+    const targetMatch = matches.find(m => m.id === targetMatchId);
+    if (!targetMatch || targetMatch.players.length >= 4) {
+      return;
+    }
+    
+    // Helper to count how many times a player has played with novices
+    const countNovicePlays = (playerId) => {
+      let count = 0;
+      matchHistory.forEach(m => {
+        const playerIds = m.players.map(mp => mp.id);
+        if (playerIds.includes(playerId)) {
+          m.players.forEach(mp => {
+            if (mp.level === 'Novice' && mp.id !== playerId) {
+              count++;
+            }
+          });
+        }
+      });
+      return count;
+    };
+    
+    // Helper to count how many times two players have played together
+    const countTimesPlayedTogether = (playerId1, playerId2) => {
+      return matchHistory.filter(m => {
+        const playerIds = m.players.map(p => p.id);
+        return playerIds.includes(playerId1) && playerIds.includes(playerId2);
+      }).length;
+    };
+    
+    let noviceAlertMessages = [];
+    let repeatAlertMessages = [];
+    
+    // Case 1: Novice player being moved - check if existing players in target have played with 2+ novices
+    if (player.level === 'Novice') {
+      const playersWithHighNoviceCount = [];
+      targetMatch.players.forEach(existingPlayer => {
+        if (existingPlayer.level === 'Novice') return;
+        const novicePlayCount = countNovicePlays(existingPlayer.id);
+        if (novicePlayCount >= 2) {
+          playersWithHighNoviceCount.push({ name: existingPlayer.name, count: novicePlayCount });
+        }
+      });
+      
+      if (playersWithHighNoviceCount.length > 0) {
+        const playersList = playersWithHighNoviceCount
+          .map(p => `• ${p.name}: ${p.count} times`)
+          .join('\n');
+        noviceAlertMessages.push(`Players in match who have played with novices 2+ times:\n${playersList}`);
+      }
+    }
+    
+    // Case 2: Non-novice player being moved - check if target match has novices and if player has played with 2+ novices
+    if (player.level !== 'Novice') {
+      const hasNoviceInMatch = targetMatch.players.some(p => p.level === 'Novice');
+      if (hasNoviceInMatch) {
+        const playerNoviceCount = countNovicePlays(player.id);
+        if (playerNoviceCount >= 2) {
+          noviceAlertMessages.push(`${player.name} has already played with novices ${playerNoviceCount} times`);
+        }
+      }
+    }
+    
+    // Check for repeat pairings (3+ times)
+    const repeatPairings = [];
+    targetMatch.players.forEach(existingPlayer => {
+      const timesPlayed = countTimesPlayedTogether(player.id, existingPlayer.id);
+      if (timesPlayed >= 3) {
+        repeatPairings.push({ name: existingPlayer.name, count: timesPlayed });
+      }
+    });
+    
+    if (repeatPairings.length > 0) {
+      const playersList = repeatPairings
+        .map(p => `• ${p.name}: ${p.count} times`)
+        .join('\n');
+      repeatAlertMessages.push(`${player.name} has played with these players 3+ times:\n${playersList}`);
+    }
+    
+    // Show novice alert if any issues detected
+    if (noviceAlertMessages.length > 0) {
+      const proceed = window.confirm(
+        `⚠️ NOVICE OVER-MATCHING ⚠️\n\n${noviceAlertMessages.join('\n\n')}\n\nDo you still want to move ${player.name} to this match?`
+      );
+      if (!proceed) return;
+    }
+    
+    // Show repeat pairings alert if any issues detected
+    if (repeatAlertMessages.length > 0) {
+      const proceed = window.confirm(
+        `⚠️ REPEAT PAIRINGS ⚠️\n\n${repeatAlertMessages.join('\n\n')}\n\nDo you still want to move ${player.name} to this match?`
+      );
+      if (!proceed) return;
+    }
+    
     setMatches(prev => prev.map(m => {
       if (m.id === sourceMatchId) {
         // Remove from source match
@@ -443,22 +655,23 @@ function App() {
   // ==================== Smart Match Algorithm ====================
   
   /**
-   * Smart Match Algorithm v22
+   * Smart Match Algorithm v23
    * 
    * Rules:
    * 1. ALWAYS prioritize longest idle time (sort by joinedAt ascending)
    * 2. Prefer Regular Doubles (4M or 4F) or Mixed Doubles (2M/2F)
-   * 3. Regular doubles preferred over mixed doubles (75% regular, 25% mixed)
+   * 3. Regular doubles preferred over mixed doubles (60% regular, 40% mixed)
    * 4. If regular doubles can't complete, fall back to mixed doubles
    *    - Works for empty matches AND matches with existing players
    *    - Only if current composition allows (≤2 of each gender)
    *    - Expert players are EXCLUDED from mixed doubles fallback
    * 5. Expert players only with experts unless non-experts already in match
-   * 6. Advanced male players prefer to be grouped with other Advanced males
-   * 7. Advanced cannot match with ANY Novice for 3 matches after matching with a Novice
-   * 8. Novice cannot match with ANY Advanced for 3 matches after matching with an Advanced
-   * 9. Advanced and Novice who have been matched together cannot match again (ever)
-   * 10. If no eligible players to complete match, leave rest blank
+   * 6. Expert players should only do Regular Doubles, unless match already has mixed genders
+   * 7. Advanced male players prefer to be grouped with other Advanced males
+   * 8. Advanced cannot match with ANY Novice for 3 matches after matching with a Novice
+   * 9. Novice cannot match with ANY Advanced for 3 matches after matching with an Advanced
+   * 10. Advanced and Novice who have been matched together cannot match again (ever)
+   * 11. If no eligible players to complete match, leave rest blank
    */
   const smartMatch = (matchId) => {
     const availablePlayers = getAvailablePoolPlayers();
@@ -490,12 +703,16 @@ function App() {
     const hasNonExpertInMatch = currentPlayers.some(p => p.level !== 'Expert');
     const hasNoviceInMatch = currentPlayers.some(p => p.level === 'Novice');
     const novicesInMatch = currentPlayers.filter(p => p.level === 'Novice');
+    const isAlreadyMixed = currentMales > 0 && currentFemales > 0;
     
     // Helper functions
     // Rule: Advanced cannot pair with ANY Novice for 3 matches after pairing with a Novice
     const canAdvancedPairWithNovice = (advancedPlayer, novicePlayer = null) => {
-      const matchesSinceNovice = (advancedPlayer.playCount || 0) - (advancedPlayer.lastNoviceMatchAt || 0);
-      if ((advancedPlayer.lastNoviceMatchAt || 0) > 0 && matchesSinceNovice < 3) return false;
+      // Check 3-match cooldown: use pairedNovices to know if they've ever matched with novice
+      if ((advancedPlayer.pairedNovices || []).length > 0) {
+        const matchesSinceNovice = (advancedPlayer.playCount || 0) - (advancedPlayer.lastNoviceMatchAt || 0);
+        if (matchesSinceNovice < 3) return false;
+      }
       
       // Rule: Advanced cannot pair with the same Novice twice ever
       if (novicePlayer && (advancedPlayer.pairedNovices || []).includes(novicePlayer.id)) return false;
@@ -505,11 +722,34 @@ function App() {
     
     // Rule: Novice cannot pair with ANY Advanced for 3 matches after pairing with an Advanced
     const canNovicePairWithAdvanced = (novicePlayer, advancedPlayer = null) => {
-      const matchesSinceAdvanced = (novicePlayer.playCount || 0) - (novicePlayer.lastAdvancedMatchAt || 0);
-      if ((novicePlayer.lastAdvancedMatchAt || 0) > 0 && matchesSinceAdvanced < 3) return false;
+      // Check 3-match cooldown: use pairedAdvanced to know if they've ever matched with advanced
+      if ((novicePlayer.pairedAdvanced || []).length > 0) {
+        const matchesSinceAdvanced = (novicePlayer.playCount || 0) - (novicePlayer.lastAdvancedMatchAt || 0);
+        if (matchesSinceAdvanced < 3) return false;
+      }
       
       // Rule: Novice cannot pair with the same Advanced twice ever
       if (advancedPlayer && (novicePlayer.pairedAdvanced || []).includes(advancedPlayer.id)) return false;
+      
+      return true;
+    };
+    
+    // Rule: Intermediate cannot pair with Novice more than twice total
+    // Rule: Intermediate cannot pair with the same Novice twice
+    // Rule: Intermediate cannot pair with Novice 2 times in a row
+    const canIntermediatePairWithNovice = (intermediatePlayer, novicePlayer = null) => {
+      // Check total count (max 2 times with any novice)
+      if ((intermediatePlayer.intermediateNoviceCount || 0) >= 2) return false;
+      
+      // Check 2-in-a-row: must have at least 1 non-novice match between novice matches
+      // Use intermediateNoviceCount > 0 to know if they've ever matched with novice
+      if ((intermediatePlayer.intermediateNoviceCount || 0) > 0) {
+        const matchesSinceNovice = (intermediatePlayer.playCount || 0) - (intermediatePlayer.lastIntermediateNoviceMatchAt || 0);
+        if (matchesSinceNovice < 2) return false; // Need at least 2 (the novice match itself + 1 more)
+      }
+      
+      // Check if paired with this specific novice before
+      if (novicePlayer && (intermediatePlayer.pairedNovicesAsIntermediate || []).includes(novicePlayer.id)) return false;
       
       return true;
     };
@@ -543,9 +783,14 @@ function App() {
         if (player.gender === 'female' && totalFemales > 2) {
           return { eligible: false, reason: `${player.name} would make too many females for mixed (max 2)` };
         }
+        
+        // Rule 6: Expert players should only do Regular Doubles unless match already has mixed genders
+        if (player.level === 'Expert' && !isAlreadyMixed) {
+          return { eligible: false, reason: `${player.name} (Expert) prefers Regular Doubles only` };
+        }
       }
       
-      // Rule 4: Expert only with experts unless non-experts already in match
+      // Rule 5: Expert only with experts unless non-experts already in match
       if (player.level === 'Expert' && hasNonExpert && !allPlayers.some(p => p.level === 'Expert')) {
         return { eligible: false, reason: `${player.name} (Expert) cannot join - match has non-Expert players` };
       }
@@ -575,12 +820,13 @@ function App() {
       }
       if (player.level === 'Novice') {
         const advancedPlayers = allPlayers.filter(p => p.level === 'Advanced');
-        // Check if Novice can pair with ANY advanced (3 match cooldown)
+        const intermediatePlayers = allPlayers.filter(p => p.level === 'Intermediate');
+        
+        // Check Advanced restrictions
         if (advancedPlayers.length > 0 && !canNovicePairWithAdvanced(player, null)) {
           return { eligible: false, reason: `${player.name} (Novice) needs 3 matches before pairing with Advanced again` };
         }
         for (const adv of advancedPlayers) {
-          // Check if this Advanced can pair with Novice
           if (!canAdvancedPairWithNovice(adv, null)) {
             return { eligible: false, reason: `${adv.name} (Advanced) needs 3 matches before pairing with Novice` };
           }
@@ -589,6 +835,41 @@ function App() {
           }
           if ((player.pairedAdvanced || []).includes(adv.id)) {
             return { eligible: false, reason: `${player.name} (Novice) already paired with ${adv.name} before` };
+          }
+        }
+        
+        // Check Intermediate restrictions
+        for (const inter of intermediatePlayers) {
+          if (!canIntermediatePairWithNovice(inter, player)) {
+            if ((inter.intermediateNoviceCount || 0) >= 2) {
+              return { eligible: false, reason: `${inter.name} (Intermediate) already matched with Novice 2 times` };
+            }
+            if ((inter.pairedNovicesAsIntermediate || []).includes(player.id)) {
+              return { eligible: false, reason: `${inter.name} (Intermediate) already paired with ${player.name} before` };
+            }
+            const matchesSince = (inter.playCount || 0) - (inter.lastIntermediateNoviceMatchAt || 0);
+            if (matchesSince < 2) {
+              return { eligible: false, reason: `${inter.name} (Intermediate) just played with a Novice, needs 1 match break` };
+            }
+          }
+        }
+      }
+      
+      // Rules for Intermediate + Novice restrictions
+      if (player.level === 'Intermediate' && hasNovice) {
+        if (!canIntermediatePairWithNovice(player, null)) {
+          if ((player.intermediateNoviceCount || 0) >= 2) {
+            return { eligible: false, reason: `${player.name} (Intermediate) already matched with Novice 2 times total` };
+          }
+          const matchesSince = (player.playCount || 0) - (player.lastIntermediateNoviceMatchAt || 0);
+          if (matchesSince < 2) {
+            return { eligible: false, reason: `${player.name} (Intermediate) just played with a Novice, needs 1 match break` };
+          }
+        }
+        // Check against specific novices
+        for (const novice of novicesInSelection) {
+          if ((player.pairedNovicesAsIntermediate || []).includes(novice.id)) {
+            return { eligible: false, reason: `${player.name} (Intermediate) already paired with ${novice.name} before` };
           }
         }
       }
@@ -601,8 +882,12 @@ function App() {
     
     // Determine target gender mode
     if (currentPlayers.length === 0) {
-      // Empty match - decide mode (70% regular, 30% mixed)
-      const isMixed = Math.random() < 0.30;
+      // Empty match - decide mode (60% regular, 40% mixed)
+      // But if the longest-waiting player is an Expert, force Regular Doubles
+      const longestWaiting = sortedPlayers[0];
+      const isLongestWaitingExpert = longestWaiting && longestWaiting.level === 'Expert';
+      
+      const isMixed = !isLongestWaitingExpert && Math.random() < 0.40;
       if (isMixed) {
         targetGenderMode = 'mixed';
       } else {
@@ -738,10 +1023,16 @@ function App() {
         return updated;
       });
       
+      // Store smartMatchedPlayerIds directly on the match
+      const newSmartMatchedIds = selectedPlayers.map(p => p.id);
+      
       setMatches(prev => {
         const updatedMatches = prev.map(m => {
           if (m.id === matchId) {
-            return { ...m, players: [...m.players, ...selectedPlayers] };
+            // Merge with any existing smartMatchedPlayerIds
+            const existingIds = m.smartMatchedPlayerIds || [];
+            const mergedIds = [...new Set([...existingIds, ...newSmartMatchedIds])];
+            return { ...m, players: [...m.players, ...selectedPlayers], smartMatchedPlayerIds: mergedIds };
           }
           return m;
         });
@@ -892,17 +1183,35 @@ function App() {
         // Helper functions
         // Rule: Advanced cannot pair with ANY Novice for 3 matches after pairing with a Novice
         const canAdvancedPairWithNovice = (advancedPlayer, novicePlayer = null) => {
-          const matchesSinceNovice = (advancedPlayer.playCount || 0) - (advancedPlayer.lastNoviceMatchAt || 0);
-          if ((advancedPlayer.lastNoviceMatchAt || 0) > 0 && matchesSinceNovice < 3) return false;
+          // Check 3-match cooldown: use pairedNovices to know if they've ever matched with novice
+          if ((advancedPlayer.pairedNovices || []).length > 0) {
+            const matchesSinceNovice = (advancedPlayer.playCount || 0) - (advancedPlayer.lastNoviceMatchAt || 0);
+            if (matchesSinceNovice < 3) return false;
+          }
           if (novicePlayer && (advancedPlayer.pairedNovices || []).includes(novicePlayer.id)) return false;
           return true;
         };
         
         // Rule: Novice cannot pair with ANY Advanced for 3 matches after pairing with an Advanced
         const canNovicePairWithAdvanced = (novicePlayer, advancedPlayer = null) => {
-          const matchesSinceAdvanced = (novicePlayer.playCount || 0) - (novicePlayer.lastAdvancedMatchAt || 0);
-          if ((novicePlayer.lastAdvancedMatchAt || 0) > 0 && matchesSinceAdvanced < 3) return false;
+          // Check 3-match cooldown: use pairedAdvanced to know if they've ever matched with advanced
+          if ((novicePlayer.pairedAdvanced || []).length > 0) {
+            const matchesSinceAdvanced = (novicePlayer.playCount || 0) - (novicePlayer.lastAdvancedMatchAt || 0);
+            if (matchesSinceAdvanced < 3) return false;
+          }
           if (advancedPlayer && (novicePlayer.pairedAdvanced || []).includes(advancedPlayer.id)) return false;
+          return true;
+        };
+        
+        // Rule: Intermediate cannot pair with Novice more than twice total, or same novice twice, or 2 in a row
+        const canIntermediatePairWithNovice = (intermediatePlayer, novicePlayer = null) => {
+          if ((intermediatePlayer.intermediateNoviceCount || 0) >= 2) return false;
+          // Check 2-in-a-row using intermediateNoviceCount to know if they've matched with novice before
+          if ((intermediatePlayer.intermediateNoviceCount || 0) > 0) {
+            const matchesSinceNovice = (intermediatePlayer.playCount || 0) - (intermediatePlayer.lastIntermediateNoviceMatchAt || 0);
+            if (matchesSinceNovice < 2) return false; // Need at least 2 (the novice match + 1 more)
+          }
+          if (novicePlayer && (intermediatePlayer.pairedNovicesAsIntermediate || []).includes(novicePlayer.id)) return false;
           return true;
         };
         
@@ -940,11 +1249,26 @@ function App() {
           }
           if (player.level === 'Novice') {
             const advancedPlayers = allPlayers.filter(p => p.level === 'Advanced');
+            const intermediatePlayers = allPlayers.filter(p => p.level === 'Intermediate');
+            
             if (advancedPlayers.length > 0 && !canNovicePairWithAdvanced(player, null)) return false;
             for (const adv of advancedPlayers) {
               if (!canAdvancedPairWithNovice(adv, null)) return false;
               if ((adv.pairedNovices || []).includes(player.id)) return false;
               if ((player.pairedAdvanced || []).includes(adv.id)) return false;
+            }
+            
+            // Check Intermediate restrictions
+            for (const inter of intermediatePlayers) {
+              if (!canIntermediatePairWithNovice(inter, player)) return false;
+            }
+          }
+          
+          // Intermediate-Novice restrictions
+          if (player.level === 'Intermediate' && hasNovice) {
+            if (!canIntermediatePairWithNovice(player, null)) return false;
+            for (const novice of novicesInSelection) {
+              if ((player.pairedNovicesAsIntermediate || []).includes(novice.id)) return false;
             }
           }
           
@@ -1101,7 +1425,7 @@ function App() {
           }
         });
         
-        // Add players to matches
+        // Add players to matches and track smartMatchedPlayerIds
         return updated.map(m => {
           const playersToAdd = allAddedPlayers
             .filter(ap => ap.matchId === m.id)
@@ -1109,7 +1433,11 @@ function App() {
             .filter(Boolean);
           
           if (playersToAdd.length > 0) {
-            return { ...m, players: [...m.players, ...playersToAdd] };
+            // Merge with any existing smartMatchedPlayerIds
+            const existingIds = m.smartMatchedPlayerIds || [];
+            const newIds = playersToAdd.map(p => p.id);
+            const mergedIds = [...new Set([...existingIds, ...newIds])];
+            return { ...m, players: [...m.players, ...playersToAdd], smartMatchedPlayerIds: mergedIds };
           }
           return m;
         });
@@ -1321,17 +1649,22 @@ function App() {
     // Check if match has both Advanced and Novice players
     const hasAdvanced = matchToMove.players.some(p => p.level === 'Advanced');
     const hasNovice = matchToMove.players.some(p => p.level === 'Novice');
+    const hasIntermediate = matchToMove.players.some(p => p.level === 'Intermediate');
     const advancedWithNovice = hasAdvanced && hasNovice;
+    const intermediateWithNovice = hasIntermediate && hasNovice;
     
-    // Get IDs of Advanced and Novice players in this match
+    // Get IDs of Advanced, Intermediate, and Novice players in this match
     const advancedPlayerIds = matchToMove.players
       .filter(p => p.level === 'Advanced')
+      .map(p => p.id);
+    const intermediatePlayerIds = matchToMove.players
+      .filter(p => p.level === 'Intermediate')
       .map(p => p.id);
     const novicePlayerIds = matchToMove.players
       .filter(p => p.level === 'Novice')
       .map(p => p.id);
     
-    // Update pool players: track Advanced-Novice pairing history
+    // Update pool players: track Advanced-Novice and Intermediate-Novice pairing history
     setPoolPlayers(prev => prev.map(p => {
       if (playerIds.includes(p.id)) {
         const updates = {};
@@ -1348,6 +1681,22 @@ function App() {
             }
           });
           updates.pairedNovices = newPairedNovices;
+        }
+        
+        // For Intermediate players matched with Novice
+        if (p.level === 'Intermediate' && intermediateWithNovice) {
+          // Track when they last matched with a Novice
+          updates.lastIntermediateNoviceMatchAt = p.playCount || 0;
+          // Increment total novice match count
+          updates.intermediateNoviceCount = (p.intermediateNoviceCount || 0) + 1;
+          // Add the novice IDs to their pairedNovicesAsIntermediate list
+          const newPairedNovices = [...(p.pairedNovicesAsIntermediate || [])];
+          novicePlayerIds.forEach(noviceId => {
+            if (!newPairedNovices.includes(noviceId)) {
+              newPairedNovices.push(noviceId);
+            }
+          });
+          updates.pairedNovicesAsIntermediate = newPairedNovices;
         }
         
         // For Novice players matched with Advanced
@@ -1371,9 +1720,16 @@ function App() {
       return p;
     }));
     
+    // Use smartMatchedPlayerIds stored on the match (not from smartMatchedPlayers state)
+    const smartMatchedPlayerIds = matchToMove.smartMatchedPlayerIds || [];
+    
     setCourts(prev => {
       return prev.map(c => 
-        c.id === courtId ? { ...c, match: matchToMove, startTime: Date.now() } : c
+        c.id === courtId ? { 
+          ...c, 
+          match: { ...matchToMove, smartMatchedPlayerIds }, 
+          startTime: Date.now() 
+        } : c
       );
     });
     
@@ -1420,8 +1776,16 @@ function App() {
           ...p, 
           joinedAt: Date.now(), 
           playCount: (p.playCount || 0) + 1,
+          // Preserve all tracking properties
           noviceMatchCount: p.noviceMatchCount || 0,
-          lastMatchedNovice: p.lastMatchedNovice || false
+          lastNoviceMatchAt: p.lastNoviceMatchAt || 0,
+          lastAdvancedMatchAt: p.lastAdvancedMatchAt || 0,
+          pairedNovices: p.pairedNovices || [],
+          pairedAdvanced: p.pairedAdvanced || [],
+          lastMatchedNovice: p.lastMatchedNovice || false,
+          intermediateNoviceCount: p.intermediateNoviceCount || 0,
+          lastIntermediateNoviceMatchAt: p.lastIntermediateNoviceMatchAt || 0,
+          pairedNovicesAsIntermediate: p.pairedNovicesAsIntermediate || []
         }));
       
       return [...updatedPool, ...newPlayers];
@@ -1448,8 +1812,20 @@ function App() {
         const filteredPlayers = court.match.players.filter(p => !removedWhileOnCourt.has(p.id));
         const matchWithFilteredPlayers = { ...court.match, players: filteredPlayers };
         
-        // Add the match back to the matches queue with filtered players
-        setMatches(prevMatches => [...prevMatches, matchWithFilteredPlayers]);
+        // Add the match back to the matches queue at the correct position (by matchNumber)
+        setMatches(prevMatches => {
+          // Find the right position to insert based on matchNumber
+          const insertIndex = prevMatches.findIndex(m => m.matchNumber > matchWithFilteredPlayers.matchNumber);
+          if (insertIndex === -1) {
+            // Insert before the last empty match if one exists, otherwise at end
+            const lastMatch = prevMatches[prevMatches.length - 1];
+            if (lastMatch && lastMatch.players && lastMatch.players.length === 0) {
+              return [...prevMatches.slice(0, -1), matchWithFilteredPlayers, lastMatch];
+            }
+            return [...prevMatches, matchWithFilteredPlayers];
+          }
+          return [...prevMatches.slice(0, insertIndex), matchWithFilteredPlayers, ...prevMatches.slice(insertIndex)];
+        });
         
         // Track that this match was returned (for pulsating highlight)
         setReturnedMatches(prev => ({
@@ -1518,6 +1894,7 @@ function App() {
         onOpenDatabase={() => setIsDbModalOpen(true)} 
         onOpenHistory={() => setIsHistoryModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
+        onOpenReports={() => setIsReportsModalOpen(true)}
         onResetData={resetAllData}
         isDarkMode={isDarkMode}
         toggleTheme={() => setIsDarkMode(!isDarkMode)}
@@ -1646,6 +2023,16 @@ function App() {
         licenseInfo={licenseInfo}
         onLicenseUpdate={handleLicenseUpdate}
         playerDatabaseCount={players.length}
+      />
+
+      {/* Reports Modal */}
+      <ReportsModal
+        isOpen={isReportsModalOpen}
+        onClose={() => setIsReportsModalOpen(false)}
+        matchHistory={matchHistory}
+        players={players}
+        onClearReports={clearMatchHistory}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

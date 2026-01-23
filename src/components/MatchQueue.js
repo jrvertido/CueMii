@@ -193,7 +193,17 @@ const MatchQueue = ({
             <div>
               <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Match Queue</h2>
               <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {matches.length} pending · <span className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}>Avg wait: {averageWaitTime >= 60 ? '1h+' : `${averageWaitTime}m`}</span>
+                {matches.length} pending · <span className={
+                  averageWaitTime >= 60 
+                    ? 'text-red-500 font-semibold' 
+                    : averageWaitTime > 40 
+                      ? 'text-red-500' 
+                      : averageWaitTime > 30 
+                        ? 'text-amber-500' 
+                        : averageWaitTime >= 20 
+                          ? 'text-emerald-500' 
+                          : isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
+                }>Avg wait: {averageWaitTime >= 60 ? '1h+' : `${averageWaitTime}m`}</span>
               </p>
             </div>
           </div>
@@ -267,16 +277,17 @@ const MatchQueue = ({
         {showScrollToTop && (
           <button
             onClick={scrollToTop}
-            className={`sticky top-0 left-1/2 -translate-x-1/2 z-10 w-8 h-8 rounded-full shadow-lg transition-all flex items-center justify-center ${
+            className={`sticky top-2 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full shadow-xl transition-all flex items-center gap-2 animate-bounce-subtle ${
               isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-black/30' 
-                : 'bg-white hover:bg-slate-100 text-slate-700 shadow-slate-300/50 border border-slate-200'
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-cyan-500/30' 
+                : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-cyan-500/40'
             }`}
             title="Scroll to top"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
             </svg>
+            <span className="text-sm font-semibold">Top</span>
           </button>
         )}
         

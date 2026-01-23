@@ -330,9 +330,22 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
                     
                     {/* Meta Info */}
                     <div className={`text-right text-xs flex-shrink-0 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      <div>{formatDateTime(match.endedAt)}</div>
-                      {match.status === 'completed' && match.startTime && (
-                        <div className={`text-[10px] ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>{formatDuration(match.startTime, match.endedAt)}</div>
+                      {match.status === 'completed' && match.startTime ? (
+                        <>
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-500'}>Start:</span>
+                            <span>{new Date(match.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                          </div>
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-500'}>End:</span>
+                            <span>{new Date(match.endedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                          </div>
+                          <div className={`text-[10px] ${isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                            ({formatDuration(match.startTime, match.endedAt)})
+                          </div>
+                        </>
+                      ) : (
+                        <div>{formatDateTime(match.endedAt)}</div>
                       )}
                     </div>
                   </div>

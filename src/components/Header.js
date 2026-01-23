@@ -8,12 +8,13 @@ import { getDaysUntilExpiration } from '../utils/licenseUtils';
  * @param {Function} props.onOpenDatabase - Callback to open player database modal
  * @param {Function} props.onOpenHistory - Callback to open match history modal
  * @param {Function} props.onOpenAbout - Callback to open about modal
+ * @param {Function} props.onOpenReports - Callback to open reports modal
  * @param {Function} props.onResetData - Callback to reset all application data
  * @param {boolean} props.isDarkMode - Current theme mode
  * @param {Function} props.toggleTheme - Callback to toggle theme
  * @param {object} props.licenseInfo - Current license information
  */
-const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onResetData, isDarkMode, toggleTheme, licenseInfo }) => {
+const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onOpenReports, onResetData, isDarkMode, toggleTheme, licenseInfo }) => {
   const daysLeft = licenseInfo?.expirationDate ? getDaysUntilExpiration(licenseInfo.expirationDate) : null;
   const showWarning = daysLeft !== null && daysLeft <= 30;
   const isExpired = daysLeft !== null && daysLeft < 0;
@@ -91,6 +92,16 @@ const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onResetData, isDar
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             History
+          </button>
+          <button
+            onClick={onOpenReports}
+            className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-400 hover:to-violet-400 px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 text-white shadow-md shadow-purple-500/25"
+            title="View reports and statistics"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Reports
           </button>
           <button
             onClick={onResetData}

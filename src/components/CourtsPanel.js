@@ -166,18 +166,6 @@ const CourtsPanel = ({
                       )}
                     </div>
                     <div className="flex items-center gap-0.5">
-                      {/* Return button - yellow left arrow */}
-                      {court.match && (
-                        <button
-                          onClick={() => returnMatchToQueue(court.id)}
-                          className={`p-0.5 rounded ${isDarkMode ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/20' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-100'}`}
-                          title="Return to queue"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                          </svg>
-                        </button>
-                      )}
                       <button
                         onClick={() => { setEditingCourtId(court.id); setEditingCourtName(court.name); }}
                         className={`p-0.5 ${isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
@@ -226,20 +214,35 @@ const CourtsPanel = ({
                     ))}
                   </div>
                   
-                  {/* End Match Button - checkmark style like v1.8.2 */}
-                  <button
-                    onClick={() => endMatch(court.id)}
-                    className={`w-full h-6 rounded text-xs font-medium flex items-center justify-center gap-1 ${
-                      isDarkMode 
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
-                    }`}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Done
-                  </button>
+                  {/* Action Buttons - Return to Queue and Done */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => returnMatchToQueue(court.id)}
+                      className={`w-1/4 h-6 rounded text-xs font-medium flex items-center justify-center ${
+                        isDarkMode 
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white' 
+                          : 'bg-amber-500 hover:bg-amber-400 text-white'
+                      }`}
+                      title="Return to queue"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => endMatch(court.id)}
+                      className={`flex-1 h-6 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                        isDarkMode 
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Done
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="px-2 pt-1.5 pb-2">
