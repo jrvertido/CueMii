@@ -9,3 +9,4 @@ export { default as MatchHistoryModal } from './MatchHistoryModal';
 export { default as LicenseEntryModal } from './LicenseEntryModal';
 export { default as AboutModal } from './AboutModal';
 export { default as ReportsModal } from './ReportsModal';
+export { default as SettingsModal } from './SettingsModal';

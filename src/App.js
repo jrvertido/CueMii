@@ -11,7 +11,8 @@ import {
   MatchHistoryModal,
   LicenseEntryModal,
   AboutModal,
-  ReportsModal
+  ReportsModal,
+  SettingsModal
 } from './components';
 import { 
   validateLicense, 
@@ -42,12 +43,18 @@ function App() {
   const [nextMatchNumber, setNextMatchNumber] = useLocalStorage('baddixx_nextMatchNumber', 1);
   const [matchHistory, setMatchHistory] = useLocalStorage('baddixx_matchHistory', []);
   const [waitTimeHistory, setWaitTimeHistory] = useLocalStorage('baddixx_waitTimeHistory', []); // Track wait times when transferred to court
+  const [warningSettings, setWarningSettings] = useLocalStorage('baddixx_warningSettings', {
+    noviceOverMatchThreshold: 2,  // Warn when non-novice has played with novices this many times
+    noviceToNoviceThreshold: 3,   // Warn when novice has played with this many novices
+    repeatPairingsThreshold: 3    // Warn when players have played together this many times
+  });
   
   // UI State (not persisted)
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [poolLevelFilter, setPoolLevelFilter] = useState('All');
   const [selectedMatchId, setSelectedMatchId] = useState(null);
@@ -412,13 +419,13 @@ function App() {
     let noviceAlertMessages = [];
     let repeatAlertMessages = [];
     
-    // Case 1: Novice player being added - check if existing players have played with 2+ novices
+    // Case 1: Novice player being added - check if existing players have played with novices too many times
     if (player.level === 'Novice') {
       const playersWithHighNoviceCount = [];
       match.players.forEach(existingPlayer => {
         if (existingPlayer.level === 'Novice') return; // Skip novice players
         const novicePlayCount = countNovicePlays(existingPlayer.id);
-        if (novicePlayCount >= 2) {
+        if (novicePlayCount >= warningSettings.noviceOverMatchThreshold) {
           playersWithHighNoviceCount.push({ name: existingPlayer.name, count: novicePlayCount });
         }
       });
@@ -427,26 +434,35 @@ function App() {
         const playersList = playersWithHighNoviceCount
           .map(p => `• ${p.name}: ${p.count} times`)
           .join('\n');
-        noviceAlertMessages.push(`Players in match who have played with novices 2+ times:\n${playersList}`);
+        noviceAlertMessages.push(`Players in match who have played with novices ${warningSettings.noviceOverMatchThreshold}+ times:\n${playersList}`);
+      }
+      
+      // Case 1b: Novice being added to match with existing novice - check if novice being added has played with too many novices
+      const hasNoviceInMatch = match.players.some(p => p.level === 'Novice');
+      if (hasNoviceInMatch) {
+        const novicePlayCount = countNovicePlays(player.id);
+        if (novicePlayCount >= warningSettings.noviceToNoviceThreshold) {
+          noviceAlertMessages.push(`${player.name} (Novice) has already played with novices ${novicePlayCount} times`);
+        }
       }
     }
     
-    // Case 2: Non-novice player being added - check if match has novices and if player has played with 2+ novices
+    // Case 2: Non-novice player being added - check if match has novices and if player has played with novices too many times
     if (player.level !== 'Novice') {
       const hasNoviceInMatch = match.players.some(p => p.level === 'Novice');
       if (hasNoviceInMatch) {
         const playerNoviceCount = countNovicePlays(player.id);
-        if (playerNoviceCount >= 2) {
+        if (playerNoviceCount >= warningSettings.noviceOverMatchThreshold) {
           noviceAlertMessages.push(`${player.name} has already played with novices ${playerNoviceCount} times`);
         }
       }
     }
     
-    // Check for repeat pairings (3+ times)
+    // Check for repeat pairings
     const repeatPairings = [];
     match.players.forEach(existingPlayer => {
       const timesPlayed = countTimesPlayedTogether(player.id, existingPlayer.id);
-      if (timesPlayed >= 3) {
+      if (timesPlayed >= warningSettings.repeatPairingsThreshold) {
         repeatPairings.push({ name: existingPlayer.name, count: timesPlayed });
       }
     });
@@ -455,7 +471,7 @@ function App() {
       const playersList = repeatPairings
         .map(p => `• ${p.name}: ${p.count} times`)
         .join('\n');
-      repeatAlertMessages.push(`${player.name} has played with these players 3+ times:\n${playersList}`);
+      repeatAlertMessages.push(`${player.name} has played with these players ${warningSettings.repeatPairingsThreshold}+ times:\n${playersList}`);
     }
     
     // Show novice alert if any issues detected
@@ -528,13 +544,13 @@ function App() {
     let noviceAlertMessages = [];
     let repeatAlertMessages = [];
     
-    // Case 1: Novice player being moved - check if existing players in target have played with 2+ novices
+    // Case 1: Novice player being moved - check if existing players in target have played with novices too many times
     if (player.level === 'Novice') {
       const playersWithHighNoviceCount = [];
       targetMatch.players.forEach(existingPlayer => {
         if (existingPlayer.level === 'Novice') return;
         const novicePlayCount = countNovicePlays(existingPlayer.id);
-        if (novicePlayCount >= 2) {
+        if (novicePlayCount >= warningSettings.noviceOverMatchThreshold) {
           playersWithHighNoviceCount.push({ name: existingPlayer.name, count: novicePlayCount });
         }
       });
@@ -543,26 +559,35 @@ function App() {
         const playersList = playersWithHighNoviceCount
           .map(p => `• ${p.name}: ${p.count} times`)
           .join('\n');
-        noviceAlertMessages.push(`Players in match who have played with novices 2+ times:\n${playersList}`);
+        noviceAlertMessages.push(`Players in match who have played with novices ${warningSettings.noviceOverMatchThreshold}+ times:\n${playersList}`);
+      }
+      
+      // Case 1b: Novice being moved to match with existing novice - check if novice being moved has played with too many novices
+      const hasNoviceInMatch = targetMatch.players.some(p => p.level === 'Novice');
+      if (hasNoviceInMatch) {
+        const novicePlayCount = countNovicePlays(player.id);
+        if (novicePlayCount >= warningSettings.noviceToNoviceThreshold) {
+          noviceAlertMessages.push(`${player.name} (Novice) has already played with novices ${novicePlayCount} times`);
+        }
       }
     }
     
-    // Case 2: Non-novice player being moved - check if target match has novices and if player has played with 2+ novices
+    // Case 2: Non-novice player being moved - check if target match has novices and if player has played with novices too many times
     if (player.level !== 'Novice') {
       const hasNoviceInMatch = targetMatch.players.some(p => p.level === 'Novice');
       if (hasNoviceInMatch) {
         const playerNoviceCount = countNovicePlays(player.id);
-        if (playerNoviceCount >= 2) {
+        if (playerNoviceCount >= warningSettings.noviceOverMatchThreshold) {
           noviceAlertMessages.push(`${player.name} has already played with novices ${playerNoviceCount} times`);
         }
       }
     }
     
-    // Check for repeat pairings (3+ times)
+    // Check for repeat pairings
     const repeatPairings = [];
     targetMatch.players.forEach(existingPlayer => {
       const timesPlayed = countTimesPlayedTogether(player.id, existingPlayer.id);
-      if (timesPlayed >= 3) {
+      if (timesPlayed >= warningSettings.repeatPairingsThreshold) {
         repeatPairings.push({ name: existingPlayer.name, count: timesPlayed });
       }
     });
@@ -571,7 +596,7 @@ function App() {
       const playersList = repeatPairings
         .map(p => `• ${p.name}: ${p.count} times`)
         .join('\n');
-      repeatAlertMessages.push(`${player.name} has played with these players 3+ times:\n${playersList}`);
+      repeatAlertMessages.push(`${player.name} has played with these players ${warningSettings.repeatPairingsThreshold}+ times:\n${playersList}`);
     }
     
     // Show novice alert if any issues detected
@@ -1895,6 +1920,7 @@ function App() {
         onOpenHistory={() => setIsHistoryModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
         onOpenReports={() => setIsReportsModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onResetData={resetAllData}
         isDarkMode={isDarkMode}
         toggleTheme={() => setIsDarkMode(!isDarkMode)}
@@ -2033,6 +2059,15 @@ function App() {
         players={players}
         onClearReports={clearMatchHistory}
         isDarkMode={isDarkMode}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        isDarkMode={isDarkMode}
+        warningSettings={warningSettings}
+        onUpdateSettings={setWarningSettings}
       />
     </div>
   );

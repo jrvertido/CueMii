@@ -119,12 +119,12 @@ const MatchQueue = ({
     return parts[0];
   };
 
-  // Check if player was smart matched within the last 3 minutes
+  // Check if player was smart matched within the last 30 seconds
   const isRecentlySmartMatched = (playerId) => {
     const matchedAt = smartMatchedPlayers[playerId];
     if (!matchedAt) return false;
-    const threeMinutes = 3 * 60 * 1000;
-    return (currentTime - matchedAt) < threeMinutes;
+    const thirtySeconds = 30 * 1000;
+    return (currentTime - matchedAt) < thirtySeconds;
   };
 
   // Drag handlers for player cards in matches

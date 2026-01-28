@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 3.3.5**
+**Version 3.3.11**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,31 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v3.3.11** - Collapsible In Match Section
+  - Added: "In Match" section in Player Pool is now collapsible
+  - Changed: Collapsed by default to save space
+
+- **v3.3.10** - Match History Date Display
+  - Added: Date now shown for each match in Match History (e.g., "Jan 27")
+  - Improved: Cleaner time display format (start → end)
+
+- **v3.3.9** - Settings Modal
+  - Added: Settings button in header (gear icon)
+  - Added: Settings modal to configure warning thresholds:
+    - Novice Over-Matching Threshold (default: 2)
+    - Novice-to-Novice Threshold (default: 3)
+    - Repeat Pairings Threshold (default: 3)
+  - Settings are persisted in localStorage
+
+- **v3.3.8** - Novice-to-Novice Warning
+  - Added: When adding a novice to a match with an existing novice, warns if the novice being added has played with 3+ novices already
+
+- **v3.3.7** - Smart Match Highlight Duration
+  - Changed: Smart match glowing highlight for players reduced from 3 minutes to 30 seconds
+
+- **v3.3.6** - Return Button Size Adjustment
+  - Changed: Return to Queue button is now 1/5 width (icon only), Done button takes remaining 4/5
 
 - **v3.3.5** - Return Button Size Adjustment
   - Changed: Return to Queue button is now 1/4 width (icon only), Done button takes remaining space

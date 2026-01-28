@@ -332,12 +332,12 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
                     <div className={`text-right text-xs flex-shrink-0 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                       {match.status === 'completed' && match.startTime ? (
                         <>
-                          <div className="flex items-center gap-1 justify-end">
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-500'}>Start:</span>
-                            <span>{new Date(match.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                          <div className={`font-medium ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+                            {new Date(match.endedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </div>
                           <div className="flex items-center gap-1 justify-end">
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-500'}>End:</span>
+                            <span>{new Date(match.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>→</span>
                             <span>{new Date(match.endedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
                           </div>
                           <div className={`text-[10px] ${isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>

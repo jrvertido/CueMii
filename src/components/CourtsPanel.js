@@ -218,7 +218,7 @@ const CourtsPanel = ({
                   <div className="flex gap-1">
                     <button
                       onClick={() => returnMatchToQueue(court.id)}
-                      className={`w-1/4 h-6 rounded text-xs font-medium flex items-center justify-center ${
+                      className={`w-1/5 h-6 rounded text-xs font-medium flex items-center justify-center ${
                         isDarkMode 
                           ? 'bg-amber-600 hover:bg-amber-500 text-white' 
                           : 'bg-amber-500 hover:bg-amber-400 text-white'

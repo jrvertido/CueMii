@@ -27,6 +27,7 @@ const PlayerPool = ({
   isDarkMode = true
 }) => {
   const [dragOverSection, setDragOverSection] = useState(null);
+  const [inMatchCollapsed, setInMatchCollapsed] = useState(true); // Collapsed by default
 
   // Filter pool players based on search and level filter
   const filteredPoolPlayers = poolPlayers
@@ -379,24 +380,41 @@ const PlayerPool = ({
               )}
             </div>
 
-            {/* Players In Match Section */}
+            {/* Players In Match Section - Collapsible */}
             {playersInMatch.length > 0 && (
               <div>
-                <div className={`flex items-center gap-2 mb-2 pt-2 border-t ${
-                  isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
-                }`}>
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <h3 className={`text-sm font-semibold uppercase tracking-wider ${
-                    isDarkMode ? 'text-yellow-500' : 'text-yellow-600'
-                  }`}>
-                    In Match ({playersInMatch.length})
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {playersInMatch.map(player => (
-                    <PlayerCard key={player.id} player={player} inMatch={true} />
-                  ))}
-                </div>
+                <button
+                  onClick={() => setInMatchCollapsed(!inMatchCollapsed)}
+                  className={`w-full flex items-center justify-between gap-2 mb-2 pt-2 border-t ${
+                    isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <h3 className={`text-sm font-semibold uppercase tracking-wider ${
+                      isDarkMode ? 'text-yellow-500' : 'text-yellow-600'
+                    }`}>
+                      In Match ({playersInMatch.length})
+                    </h3>
+                  </div>
+                  <svg 
+                    className={`w-4 h-4 transition-transform ${inMatchCollapsed ? '' : 'rotate-180'} ${
+                      isDarkMode ? 'text-yellow-500' : 'text-yellow-600'
+                    }`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {!inMatchCollapsed && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {playersInMatch.map(player => (
+                      <PlayerCard key={player.id} player={player} inMatch={true} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

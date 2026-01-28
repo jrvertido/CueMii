@@ -9,12 +9,13 @@ import { getDaysUntilExpiration } from '../utils/licenseUtils';
  * @param {Function} props.onOpenHistory - Callback to open match history modal
  * @param {Function} props.onOpenAbout - Callback to open about modal
  * @param {Function} props.onOpenReports - Callback to open reports modal
+ * @param {Function} props.onOpenSettings - Callback to open settings modal
  * @param {Function} props.onResetData - Callback to reset all application data
  * @param {boolean} props.isDarkMode - Current theme mode
  * @param {Function} props.toggleTheme - Callback to toggle theme
  * @param {object} props.licenseInfo - Current license information
  */
-const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onOpenReports, onResetData, isDarkMode, toggleTheme, licenseInfo }) => {
+const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onOpenReports, onOpenSettings, onResetData, isDarkMode, toggleTheme, licenseInfo }) => {
   const daysLeft = licenseInfo?.expirationDate ? getDaysUntilExpiration(licenseInfo.expirationDate) : null;
   const showWarning = daysLeft !== null && daysLeft <= 30;
   const isExpired = daysLeft !== null && daysLeft < 0;
@@ -60,6 +61,22 @@ const Header = ({ onOpenDatabase, onOpenHistory, onOpenAbout, onOpenReports, onR
             {(isExpired || showWarning) && (
               <span className="text-xs">{isExpired ? '!' : daysLeft}</span>
             )}
+          </button>
+
+          {/* Settings Button */}
+          <button
+            onClick={onOpenSettings}
+            className={`p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+              isDarkMode 
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
+                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300'
+            }`}
+            title="Settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
           </button>
 
           {/* Theme Toggle */}
