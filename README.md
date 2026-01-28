@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 3.3.11**
+**Version 3.3.12**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,9 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v3.3.12** - Match Queue Names Uppercase
+  - Changed: Player names in Match Queue section are now displayed in ALL CAPS
 
 - **v3.3.11** - Collapsible In Match Section
   - Added: "In Match" section in Player Pool is now collapsible

@@ -113,10 +113,13 @@ const MatchQueue = ({
   // Format name as "FirstName L."
   const formatName = (name) => {
     const parts = name.split(' ');
+    let formatted;
     if (parts.length > 1) {
-      return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+      formatted = `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    } else {
+      formatted = parts[0];
     }
-    return parts[0];
+    return formatted.toUpperCase();
   };
 
   // Check if player was smart matched within the last 30 seconds
