@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 3.3.12**
+**Version 4.0.5**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -159,6 +159,171 @@ All application data is automatically saved to your browser's localStorage:
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
 ## Version History
+
+- **v4.0.5** - Clear Button for Reservations
+  - Added: Clear button now appears when a match has reservations (even with no players)
+
+- **v4.0.4** - Reservation Duplicate Prevention
+  - Fixed: Players already reserved in one match cannot be reserved in another match
+
+- **v4.0.3** - Warning Threshold Adjustments
+  - Changed: Novice Over-Matching Threshold default to 4
+  - Changed: Repeat Pairings Threshold default to 4
+  - Fixed: "Reset to Defaults" button now uses correct default values (4, 8, 4)
+
+- **v4.0.2** - Updated Warning Thresholds
+  - Changed: Novice Over-Matching Threshold default to 6
+  - Changed: Novice-to-Novice Threshold default to 8
+  - Changed: Repeat Pairings Threshold default to 8
+  - Settings now show updated default values
+
+- **v4.0.1** - Reservation Queue Fix
+  - Fixed: When top match goes to court and next match has reservations, now properly swaps with empty matches (not just matches with players)
+  - Reserved matches will always stay at position 2 or below until all reserved slots are filled
+
+- **v4.0.0** - Major Release
+  - Player Reservation System: Click empty slots to reserve players
+  - Reserved slot protection with error messages
+  - Undo End Match: Restore players, timer, and reports
+  - Up/down arrows move reservations with players
+  - Reserved matches cannot be at top of queue
+  - Auto-reorder when top match has reservations
+  - Updated default thresholds: Novice Over-Matching (4), Novice-to-Novice (6), Repeat Pairings (6)
+  - Daily Warning Counters (auto-reset each day)
+  - Match Queue to Not Present drag & drop
+  - Updated player database (149 players)
+  - UI/UX improvements throughout
+
+- **v3.3.36** - Reservation Improvements & Undo End Match
+  - Changed: Reservation display shows "Waiting for: FirstName L." format
+  - Fixed: Clear match button also clears reservations
+  - Added: Block adding player to reserved slot (shows error with reserved player name)
+  - Added: Undo button after pressing Done on a court
+    - Restores players back to the court
+    - Restores the court timer
+    - Removes the match from history/reports
+
+- **v3.3.35** - Player Reservation System
+  - Added: Click empty slot in match to reserve a player
+  - Shows "Waiting: [Player Name]" in reserved slots
+  - Click X to clear reservation
+  - Reservations auto-clear when match moves to court or is deleted
+  - Search functionality in reservation dropdown
+
+- **v3.3.34** - Match Reports Name Color Fix
+  - Changed: Player names in Match Reports (Individual Player Reports) now use neutral color
+  - Changed: Gender indicator dot (●) remains blue/pink colored
+
+- **v3.3.33** - Daily Warning Counters
+  - Changed: Warning counters now only consider matches from the current day
+  - Novice pairing warnings reset automatically each day
+  - Repeat pairing warnings reset automatically each day
+  - Match History is preserved but only today's matches count for warnings
+
+- **v3.3.32** - Updated Player Database & Match Queue Drag to Not Present
+  - Updated: Default player database now uses baddixx_players_20260211.csv (149 players)
+  - Added: 12 new players (Drix Banzuela, Jason Yu, Jet Santos, Jia Chen, Kay Joson, Mark Bal, Carmelo Arada, Renz, Salah, Sazid Chowdhury, Renz Cruz, Mark Abellon)
+  - Added: Can drag player cards from Match Queue directly to Not Present section
+
+- **v3.3.31** - Check-In Button Text Update
+  - Removed: Checkmark (✓) from Check-In button
+
+- **v3.3.30** - Not Present 2-Column Layout
+  - Changed: Player cards in Not Present section now display in 2 columns
+
+- **v3.3.29** - Not Present Section Alphabetical Grouping
+  - Removed: Gender icon from Not Present cards
+  - Changed: Names now use single neutral color instead of pink/blue
+  - Added: Names grouped by first letter with section headers (A, B, C, etc.)
+  - Only letters with players are shown
+
+- **v3.3.28** - Not Present Section Redesign
+  - Changed: Single column layout instead of 2 columns
+  - Removed: Player level from Not Present cards
+  - Changed: Player Name, Check-In button, and X button all on one line
+  - Names displayed in alphabetical order
+
+- **v3.3.27** - Player Database UI Polish
+  - Added: Separator line between Add New Player and Search sections
+  - Changed: Search bar is now smaller (more compact)
+  - Changed: "Search" label is now more prominent (cyan color, bold)
+
+- **v3.3.26** - Player Edit Propagation
+  - Fixed: Editing a player's name, gender, or level in the Database now automatically updates:
+    - Player Pool (Available players)
+    - Not Present section
+    - Match Queue (players in pending matches)
+    - Courts (players in active matches on courts)
+
+- **v3.3.25** - New Player Highlight Behavior
+  - Changed: When a newly added player is added to the pool, they are no longer highlighted or shown at the top
+  - Player is treated like other players in the database after being added to pool
+
+- **v3.3.24** - Player Name Formatting
+  - Added: New player names are automatically converted to Title Case (e.g., "john smith" → "John Smith")
+  - Added: Letter filter resets to "All" after adding a new player
+
+- **v3.3.23** - Multiple UI/UX Improvements
+  - Reports: Auto-selects today's date if data exists, otherwise "All Time"
+  - Match History: Auto-selects today's date if data exists, otherwise "All Dates"
+  - Player Database: Clears search bar after adding a new player
+  - Player Database: Reordered Add Player section (Gender → Level → Name → Add)
+  - Player Pool: Added clear button (X) for search bar
+  - Player Pool: Press Enter in search to check-in player if only 1 match in Not Present
+
+- **v3.3.22** - Quick Add to Pool with Enter Key
+  - Added: Press Enter in Player Database search to add player if exactly 1 match
+  - Only works if the player is not already in the pool
+  - Search bar clears automatically after successful add
+
+- **v3.3.21** - Match Queue UI Adjustments
+  - Changed: Select button now appears before Courts dropdown in Match Queue
+  - Updated: Average wait time color thresholds:
+    - Gray: Less than 20 minutes
+    - Yellow: 20-29 minutes
+    - Orange: 30-39 minutes
+    - Red: 40+ minutes
+
+- **v3.3.20** - Match Average Wait Time Fix v2
+  - Fixed: Average wait time now correctly looks up player's joinedAt from pool
+  - Position: Average wait time (⏱ Xm) now appears before player count (3/4)
+
+- **v3.3.19** - Match Average Wait Time Fix
+  - Fixed: Average wait time now correctly uses player's joinedAt timestamp
+  - Changed: Average wait time now appears before player count (⏱ 15m then 3/4)
+
+- **v3.3.18** - Match Average Wait Time
+  - Added: Each match now shows the average combined wait time for all players in that match
+  - Displayed as "⏱ Xm" next to the player count (e.g., "3/4 ⏱ 15m")
+  - Color-coded: gray (<10m), yellow (10-19m), orange (20-29m), red (30m+)
+
+- **v3.3.17** - Match History Name Filter
+  - Added: Player name filter in Match History - search by name to show only matches with that person
+  - Shows filtered match count when filters are active
+  - Fixed: Add/Remove to Pool no longer resets the A-Z letter filter
+
+- **v3.3.16** - A-Z Filter Improvements
+  - Changed: A-Z letter filter now fits in one line (smaller gaps/widths)
+  - Changed: Clicking an already-selected letter now deselects it (shows all)
+  - Changed: "All" button is now wider for better visibility
+
+- **v3.3.15** - Player Database UX Enhancements
+  - Added: Search bar auto-focuses after Add/Remove to Pool
+  - Changed: Add New Player section now has cyan/teal gradient background
+  - Added: "New" label to the left of the new player name text box
+  - Added: A-Z letter filter buttons below the search bar
+  - Clicking a letter filters to show only players whose names start with that letter
+
+- **v3.3.14** - Player Database UI Improvements
+  - Fixed: Table headers now vertically centered
+  - Added: "Search" label on the left of the search bar
+  - Changed: Clicking Add/Remove to Pool now clears the search bar
+  - Fixed: Editing a player no longer skews column widths (fixed column widths)
+
+- **v3.3.13** - Auto-Reset on New Day
+  - Added: Session data automatically resets at the start of a new day
+  - Clears: Player Pool, Not Present, Matches, Courts, Wait Time History
+  - Preserves: Player Database, Match History, Settings
 
 - **v3.3.12** - Match Queue Names Uppercase
   - Changed: Player names in Match Queue section are now displayed in ALL CAPS

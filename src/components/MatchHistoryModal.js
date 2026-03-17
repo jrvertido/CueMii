@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 
 /**
@@ -7,6 +7,19 @@ import * as XLSX from 'xlsx';
 const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDarkMode = true }) => {
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURN
   const [dateFilter, setDateFilter] = useState('all');
+  const [nameFilter, setNameFilter] = useState('');
+
+  // Auto-select today's date if data exists when modal opens
+  useEffect(() => {
+    if (isOpen && matchHistory) {
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      const hasTodayData = matchHistory.some(match => {
+        if (!match.endedAt) return false;
+        return new Date(match.endedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) === today;
+      });
+      setDateFilter(hasTodayData ? today : 'all');
+    }
+  }, [isOpen, matchHistory]);
 
   // Get unique dates from match history
   const availableDates = useMemo(() => {
@@ -21,16 +34,27 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
     return Array.from(dates).sort((a, b) => new Date(b) - new Date(a));
   }, [matchHistory]);
 
-  // Filter by date
+  // Filter by date and name
   const filteredHistory = useMemo(() => {
     if (!matchHistory) return [];
     return matchHistory.filter(match => {
-      if (dateFilter === 'all') return true;
-      if (!match.endedAt) return false;
-      const matchDate = new Date(match.endedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      return matchDate === dateFilter;
+      // Date filter
+      if (dateFilter !== 'all') {
+        if (!match.endedAt) return false;
+        const matchDate = new Date(match.endedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        if (matchDate !== dateFilter) return false;
+      }
+      // Name filter
+      if (nameFilter.trim()) {
+        const searchLower = nameFilter.toLowerCase().trim();
+        const hasPlayer = match.players?.some(p => 
+          p.name.toLowerCase().includes(searchLower)
+        );
+        if (!hasPlayer) return false;
+      }
+      return true;
     });
-  }, [matchHistory, dateFilter]);
+  }, [matchHistory, dateFilter, nameFilter]);
 
   // Sort by endedAt (most recent first)
   const sortedHistory = useMemo(() => {
@@ -196,22 +220,43 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
         <div className={`px-4 py-2 border-b flex items-center justify-between ${
           isDarkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Filter by date:</span>
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className={`border rounded px-2 py-1 text-xs focus:outline-none ${
-                isDarkMode 
-                  ? 'bg-slate-800 border-slate-600 text-white' 
-                  : 'bg-white border-slate-300 text-slate-800'
-              }`}
-            >
-              <option value="all">All Dates ({matchHistory?.length || 0})</option>
-              {availableDates.map(date => (
-                <option key={date} value={date}>{date}</option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date:</span>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className={`border rounded px-2 py-1 text-xs focus:outline-none ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-600 text-white' 
+                    : 'bg-white border-slate-300 text-slate-800'
+                }`}
+              >
+                <option value="all">All Dates ({matchHistory?.length || 0})</option>
+                {availableDates.map(date => (
+                  <option key={date} value={date}>{date}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Player:</span>
+              <input
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                placeholder="Search by name..."
+                className={`border rounded px-2 py-1 text-xs focus:outline-none w-36 ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500' 
+                    : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                }`}
+              />
+            </div>
+            {(dateFilter !== 'all' || nameFilter) && (
+              <span className={`text-xs ${isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                ({filteredHistory.length} match{filteredHistory.length !== 1 ? 'es' : ''})
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {matchHistory && matchHistory.length > 0 && (

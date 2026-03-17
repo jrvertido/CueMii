@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 /**
  * Reports Modal - Shows comprehensive match and player statistics
@@ -21,6 +21,18 @@ const ReportsModal = ({
   
   const overallReportRef = useRef(null);
   const individualReportRef = useRef(null);
+
+  // Auto-select today's date if data exists when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const today = new Date().toLocaleDateString('en-CA');
+      const hasTodayData = matchHistory.some(match => {
+        if (!match.endedAt) return false;
+        return new Date(match.endedAt).toLocaleDateString('en-CA') === today;
+      });
+      setSelectedDate(hasTodayData ? today : 'all');
+    }
+  }, [isOpen, matchHistory]);
 
   // Level color helper
   const getLevelColor = (level) => {
@@ -1739,9 +1751,8 @@ const ReportsModal = ({
                                                 : `${getLevelColor(p.level)} border-transparent`
                                             }`}
                                           >
-                                            <span className={p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}>
-                                              ● {p.name}
-                                            </span>
+                                            <span className={p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}>●</span>{' '}
+                                            {p.name}
                                           </span>
                                         ))}
                                       </div>

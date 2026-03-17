@@ -44,10 +44,12 @@ function App() {
   const [matchHistory, setMatchHistory] = useLocalStorage('baddixx_matchHistory', []);
   const [waitTimeHistory, setWaitTimeHistory] = useLocalStorage('baddixx_waitTimeHistory', []); // Track wait times when transferred to court
   const [warningSettings, setWarningSettings] = useLocalStorage('baddixx_warningSettings', {
-    noviceOverMatchThreshold: 2,  // Warn when non-novice has played with novices this many times
-    noviceToNoviceThreshold: 3,   // Warn when novice has played with this many novices
-    repeatPairingsThreshold: 3    // Warn when players have played together this many times
+    noviceOverMatchThreshold: 4,  // Warn when non-novice has played with novices this many times
+    noviceToNoviceThreshold: 8,   // Warn when novice has played with this many novices
+    repeatPairingsThreshold: 4    // Warn when players have played together this many times
   });
+  const [lastSessionDate, setLastSessionDate] = useLocalStorage('baddixx_lastSessionDate', null);
+  const [matchReservations, setMatchReservations] = useLocalStorage('baddixx_matchReservations', {}); // Track reserved slots: { matchId: { slotIndex: player } }
   
   // UI State (not persisted)
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
@@ -67,6 +69,7 @@ function App() {
   const [removedWhileOnCourt, setRemovedWhileOnCourt] = useState(new Set()); // Track players removed while on court
   const [returnedMatches, setReturnedMatches] = useState({}); // Track when matches were returned from court: { matchId: timestamp }
   const [highlightedPriorityMatches, setHighlightedPriorityMatches] = useState({}); // Track matches highlighted for priority: { matchId: timestamp }
+  const [lastEndedMatch, setLastEndedMatch] = useState(null); // For undo end match: { courtId, courtName, match, startTime, previousPoolPlayers, previousMatchHistory }
   
   const currentTime = useCurrentTime();
 
@@ -104,6 +107,33 @@ function App() {
     const interval = setInterval(checkExpiration, 60000); // Check every minute
     return () => clearInterval(interval);
   }, [licenseInfo]);
+
+  // Auto-reset session data at start of new day
+  useEffect(() => {
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    
+    if (lastSessionDate && lastSessionDate !== today) {
+      // It's a new day - reset session data
+      console.log(`New day detected (${lastSessionDate} → ${today}). Auto-resetting session data.`);
+      
+      // Clear session data (same as resetAllData but without confirmation)
+      setPoolPlayers([]);
+      setNotPresentPlayers([]);
+      setMatches([]);
+      setCourts(initialCourts);
+      setNextMatchNumber(1);
+      setWaitTimeHistory([]);
+      setMatchReservations({});
+      
+      // Reset UI state
+      setSelectedMatchId(null);
+      setPoolSearch('');
+      setPoolLevelFilter('All');
+    }
+    
+    // Update the last session date to today
+    setLastSessionDate(today);
+  }, []); // Only run once on mount - intentionally empty deps
 
   // Handle valid license entry
   const handleLicenseValid = (result) => {
@@ -182,6 +212,7 @@ function App() {
       setCourts(initialCourts);
       setNextMatchNumber(1);
       setWaitTimeHistory([]);
+      setMatchReservations({});
       
       // Reset UI state
       setSelectedMatchId(null);
@@ -235,8 +266,30 @@ function App() {
   };
 
   const editPlayer = (updatedPlayer) => {
+    // Update in players database
     setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
+    // Update in pool players (preserve joinedAt)
     setPoolPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer, joinedAt: p.joinedAt } : p));
+    // Update in not present players
+    setNotPresentPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer } : p));
+    // Update in matches
+    setMatches(prev => prev.map(m => ({
+      ...m,
+      players: m.players.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer } : p)
+    })));
+    // Update in courts (for active matches on courts)
+    setCourts(prev => prev.map(c => {
+      if (c.match && c.match.players) {
+        return {
+          ...c,
+          match: {
+            ...c.match,
+            players: c.match.players.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer } : p)
+          }
+        };
+      }
+      return c;
+    }));
   };
 
   const deletePlayer = (playerId) => {
@@ -361,6 +414,60 @@ function App() {
     if (lastSmartMatch?.matchId === matchId) {
       setLastSmartMatch(null);
     }
+    // Clear reservations for this match
+    setMatchReservations(prev => {
+      const newReservations = { ...prev };
+      delete newReservations[matchId];
+      return newReservations;
+    });
+  };
+
+  // Reserve a player for a specific slot in a match
+  const reservePlayerInMatch = (matchId, slotIndex, player) => {
+    setMatchReservations(prev => ({
+      ...prev,
+      [matchId]: {
+        ...(prev[matchId] || {}),
+        [slotIndex]: player
+      }
+    }));
+  };
+
+  // Clear a specific reservation
+  const clearReservation = (matchId, slotIndex) => {
+    setMatchReservations(prev => {
+      const matchRes = { ...(prev[matchId] || {}) };
+      delete matchRes[slotIndex];
+      // If no more reservations for this match, remove the match entry
+      if (Object.keys(matchRes).length === 0) {
+        const newReservations = { ...prev };
+        delete newReservations[matchId];
+        return newReservations;
+      }
+      return { ...prev, [matchId]: matchRes };
+    });
+  };
+
+  // Clear reservation when the reserved player is actually added to the match
+  const clearReservationForPlayer = (matchId, playerId) => {
+    setMatchReservations(prev => {
+      const matchRes = prev[matchId];
+      if (!matchRes) return prev;
+      
+      const newMatchRes = { ...matchRes };
+      for (const slotIndex in newMatchRes) {
+        if (newMatchRes[slotIndex]?.id === playerId) {
+          delete newMatchRes[slotIndex];
+        }
+      }
+      
+      if (Object.keys(newMatchRes).length === 0) {
+        const newReservations = { ...prev };
+        delete newReservations[matchId];
+        return newReservations;
+      }
+      return { ...prev, [matchId]: newMatchRes };
+    });
   };
 
   const togglePreferredCourt = (matchId, courtId) => {
@@ -392,10 +499,27 @@ function App() {
       return;
     }
     
-    // Helper to count how many times a player has played with novices
+    // Check if the next available slot is reserved for someone else
+    const nextSlotIndex = match.players.length;
+    const reservation = matchReservations[matchId]?.[nextSlotIndex];
+    if (reservation && reservation.id !== player.id) {
+      alert(`This slot is reserved for: ${reservation.name}`);
+      return;
+    }
+    
+    // Get today's date for filtering
+    const today = new Date().toLocaleDateString('en-CA');
+    
+    // Filter match history to only include today's matches
+    const todayMatches = matchHistory.filter(m => {
+      if (!m.endedAt) return false;
+      return new Date(m.endedAt).toLocaleDateString('en-CA') === today;
+    });
+    
+    // Helper to count how many times a player has played with novices (today only)
     const countNovicePlays = (playerId) => {
       let count = 0;
-      matchHistory.forEach(m => {
+      todayMatches.forEach(m => {
         const playerIds = m.players.map(mp => mp.id);
         if (playerIds.includes(playerId)) {
           m.players.forEach(mp => {
@@ -408,9 +532,9 @@ function App() {
       return count;
     };
     
-    // Helper to count how many times two players have played together
+    // Helper to count how many times two players have played together (today only)
     const countTimesPlayedTogether = (playerId1, playerId2) => {
-      return matchHistory.filter(m => {
+      return todayMatches.filter(m => {
         const playerIds = m.players.map(p => p.id);
         return playerIds.includes(playerId1) && playerIds.includes(playerId2);
       }).length;
@@ -500,6 +624,9 @@ function App() {
       
       return updatedMatches;
     });
+    
+    // Clear any reservation for this player in this match
+    clearReservationForPlayer(matchId, player.id);
   };
 
   const removePlayerFromMatch = (matchId, playerId) => {
@@ -511,16 +638,56 @@ function App() {
     }));
   };
 
+  const movePlayerFromMatchToNotPresent = (matchId, playerId) => {
+    // Find the player in the match
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+    
+    const player = match.players.find(p => p.id === playerId);
+    if (!player) return;
+    
+    // Remove from match
+    setMatches(prev => prev.map(m => {
+      if (m.id === matchId) {
+        return { ...m, players: m.players.filter(p => p.id !== playerId) };
+      }
+      return m;
+    }));
+    
+    // Remove from pool players if they're there
+    setPoolPlayers(prev => prev.filter(p => p.id !== playerId));
+    
+    // Add to not present
+    setNotPresentPlayers(prev => {
+      // Check if already in not present
+      if (prev.some(p => p.id === playerId)) return prev;
+      return [...prev, {
+        ...player,
+        joinedAt: undefined,
+        playCount: undefined
+      }];
+    });
+  };
+
   const movePlayerBetweenMatches = (sourceMatchId, targetMatchId, player) => {
     const targetMatch = matches.find(m => m.id === targetMatchId);
     if (!targetMatch || targetMatch.players.length >= 4) {
       return;
     }
     
-    // Helper to count how many times a player has played with novices
+    // Get today's date for filtering
+    const today = new Date().toLocaleDateString('en-CA');
+    
+    // Filter match history to only include today's matches
+    const todayMatches = matchHistory.filter(m => {
+      if (!m.endedAt) return false;
+      return new Date(m.endedAt).toLocaleDateString('en-CA') === today;
+    });
+    
+    // Helper to count how many times a player has played with novices (today only)
     const countNovicePlays = (playerId) => {
       let count = 0;
-      matchHistory.forEach(m => {
+      todayMatches.forEach(m => {
         const playerIds = m.players.map(mp => mp.id);
         if (playerIds.includes(playerId)) {
           m.players.forEach(mp => {
@@ -533,9 +700,9 @@ function App() {
       return count;
     };
     
-    // Helper to count how many times two players have played together
+    // Helper to count how many times two players have played together (today only)
     const countTimesPlayedTogether = (playerId1, playerId2) => {
-      return matchHistory.filter(m => {
+      return todayMatches.filter(m => {
         const playerIds = m.players.map(p => p.id);
         return playerIds.includes(playerId1) && playerIds.includes(playerId2);
       }).length;
@@ -641,6 +808,12 @@ function App() {
     if (lastSmartMatch?.matchId === matchId) {
       setLastSmartMatch(null);
     }
+    // Clear reservations for this match
+    setMatchReservations(prev => {
+      const newReservations = { ...prev };
+      delete newReservations[matchId];
+      return newReservations;
+    });
   };
 
   // Clear all players from all matches
@@ -648,23 +821,46 @@ function App() {
     setMatches(prev => prev.map(m => ({ ...m, players: [] })));
     setLastSmartMatch(null);
     setLastSmartQueueAll(null);
+    setMatchReservations({});
   };
 
   // Swap players between two adjacent matches
   const swapMatchPlayers = (matchId, direction) => {
+    // Sort by matchNumber to get correct order
+    const sortedMatches = [...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+    const sortedIndex = sortedMatches.findIndex(m => m.id === matchId);
+    if (sortedIndex === -1) return;
+    
+    const targetSortedIndex = direction === 'up' ? sortedIndex - 1 : sortedIndex + 1;
+    if (targetSortedIndex < 0 || targetSortedIndex >= sortedMatches.length) return;
+    
+    const currentMatch = sortedMatches[sortedIndex];
+    const targetMatch = sortedMatches[targetSortedIndex];
+    
+    // Check if current match has reservations
+    const currentMatchReservations = matchReservations[currentMatch.id];
+    const currentHasReservations = currentMatchReservations && Object.keys(currentMatchReservations).length > 0;
+    
+    // Check if target match has reservations
+    const targetMatchReservations = matchReservations[targetMatch.id];
+    const targetHasReservations = targetMatchReservations && Object.keys(targetMatchReservations).length > 0;
+    
+    // If moving up and would become position 0 (top) and current has reservations, show error
+    if (direction === 'up' && targetSortedIndex === 0 && currentHasReservations) {
+      const reservedNames = Object.values(currentMatchReservations).map(p => p.name).join(', ');
+      alert(`Cannot move to top of queue.\n\nThis match is waiting for: ${reservedNames}\n\nFill all reserved slots first.`);
+      return;
+    }
+    
+    // If moving down from position 0 and target has reservations, show error (target would become top)
+    if (direction === 'down' && sortedIndex === 0 && targetHasReservations) {
+      const reservedNames = Object.values(targetMatchReservations).map(p => p.name).join(', ');
+      alert(`Cannot swap - the match below is waiting for: ${reservedNames}\n\nIt cannot be moved to top of queue until all reserved slots are filled.`);
+      return;
+    }
+    
+    // Swap players between the two matches
     setMatches(prev => {
-      // Sort by matchNumber to get correct order
-      const sortedMatches = [...prev].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
-      const sortedIndex = sortedMatches.findIndex(m => m.id === matchId);
-      if (sortedIndex === -1) return prev;
-      
-      const targetSortedIndex = direction === 'up' ? sortedIndex - 1 : sortedIndex + 1;
-      if (targetSortedIndex < 0 || targetSortedIndex >= sortedMatches.length) return prev;
-      
-      const currentMatch = sortedMatches[sortedIndex];
-      const targetMatch = sortedMatches[targetSortedIndex];
-      
-      // Swap players between the two matches
       return prev.map(m => {
         if (m.id === currentMatch.id) {
           return { ...m, players: targetMatch.players };
@@ -674,6 +870,28 @@ function App() {
         }
         return m;
       });
+    });
+    
+    // Also swap reservations
+    setMatchReservations(prev => {
+      const currentRes = prev[currentMatch.id];
+      const targetRes = prev[targetMatch.id];
+      
+      const newReservations = { ...prev };
+      
+      // Remove both
+      delete newReservations[currentMatch.id];
+      delete newReservations[targetMatch.id];
+      
+      // Swap them
+      if (targetRes && Object.keys(targetRes).length > 0) {
+        newReservations[currentMatch.id] = targetRes;
+      }
+      if (currentRes && Object.keys(currentRes).length > 0) {
+        newReservations[targetMatch.id] = currentRes;
+      }
+      
+      return newReservations;
     });
   };
 
@@ -1758,8 +1976,91 @@ function App() {
       );
     });
     
-    setMatches(prev => prev.filter(m => m.id !== matchId));
+    // Determine if we need to swap after removing this match
+    const remainingMatches = matches.filter(m => m.id !== matchId);
+    let swapTopMatchId = null;
+    let swapWithMatchId = null;
+    
+    if (remainingMatches.length > 1) {
+      const sorted = [...remainingMatches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+      const topMatch = sorted[0];
+      const topMatchReservations = matchReservations[topMatch.id];
+      const topHasReservations = topMatchReservations && Object.keys(topMatchReservations).length > 0;
+      
+      if (topHasReservations) {
+        // First, try to find a match without reservations that has players
+        for (let i = 1; i < sorted.length; i++) {
+          const matchRes = matchReservations[sorted[i].id];
+          const hasRes = matchRes && Object.keys(matchRes).length > 0;
+          if (!hasRes && sorted[i].players.length > 0) {
+            swapTopMatchId = topMatch.id;
+            swapWithMatchId = sorted[i].id;
+            break;
+          }
+        }
+        
+        // If no match with players found, find any empty match without reservations
+        if (!swapWithMatchId) {
+          for (let i = 1; i < sorted.length; i++) {
+            const matchRes = matchReservations[sorted[i].id];
+            const hasRes = matchRes && Object.keys(matchRes).length > 0;
+            if (!hasRes) {
+              swapTopMatchId = topMatch.id;
+              swapWithMatchId = sorted[i].id;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    setMatches(prev => {
+      const remaining = prev.filter(m => m.id !== matchId);
+      
+      // Swap players if needed
+      if (swapTopMatchId && swapWithMatchId) {
+        const topMatch = remaining.find(m => m.id === swapTopMatchId);
+        const swapMatch = remaining.find(m => m.id === swapWithMatchId);
+        if (topMatch && swapMatch) {
+          return remaining.map(m => {
+            if (m.id === swapTopMatchId) {
+              return { ...m, players: swapMatch.players };
+            }
+            if (m.id === swapWithMatchId) {
+              return { ...m, players: topMatch.players };
+            }
+            return m;
+          });
+        }
+      }
+      
+      return remaining;
+    });
     if (selectedMatchId === matchId) setSelectedMatchId(null);
+    
+    // Clear reservations for this match and swap reservations if needed
+    setMatchReservations(prev => {
+      const newReservations = { ...prev };
+      delete newReservations[matchId];
+      
+      // Swap reservations if we swapped players
+      if (swapTopMatchId && swapWithMatchId) {
+        const topRes = newReservations[swapTopMatchId];
+        const swapRes = newReservations[swapWithMatchId];
+        
+        delete newReservations[swapTopMatchId];
+        delete newReservations[swapWithMatchId];
+        
+        if (swapRes && Object.keys(swapRes).length > 0) {
+          newReservations[swapTopMatchId] = swapRes;
+        }
+        if (topRes && Object.keys(topRes).length > 0) {
+          newReservations[swapWithMatchId] = topRes;
+        }
+      }
+      
+      return newReservations;
+    });
   };
 
   const endMatch = (courtId) => {
@@ -1769,6 +2070,21 @@ function App() {
     
     const matchPlayerIds = court.match.players.map(p => p.id);
     const matchPlayers = court.match.players;
+    
+    // Save undo state before making any changes
+    const previousPoolPlayersState = poolPlayers
+      .filter(p => matchPlayerIds.includes(p.id))
+      .map(p => ({ ...p }));
+    
+    setLastEndedMatch({
+      courtId: court.id,
+      courtName: court.name,
+      match: { ...court.match },
+      startTime: court.startTime,
+      previousPoolPlayers: previousPoolPlayersState,
+      matchHistoryLength: matchHistory.length,
+      removedWhileOnCourtPlayers: [...removedWhileOnCourt].filter(id => matchPlayerIds.includes(id))
+    });
     
     // Save match to history (only once)
     setMatchHistory(prevHistory => [...prevHistory, {
@@ -1827,6 +2143,47 @@ function App() {
     setCourts(prev => prev.map(c => 
       c.id === courtId ? { ...c, match: null, startTime: null } : c
     ));
+  };
+
+  // Undo the last ended match
+  const undoEndMatch = () => {
+    if (!lastEndedMatch) return;
+    
+    const { courtId, match, startTime, previousPoolPlayers, matchHistoryLength, removedWhileOnCourtPlayers } = lastEndedMatch;
+    const matchPlayerIds = match.players.map(p => p.id);
+    
+    // Remove the match from history (it was the last one added)
+    setMatchHistory(prev => prev.slice(0, matchHistoryLength));
+    
+    // Restore court with match
+    setCourts(prev => prev.map(c => 
+      c.id === courtId ? { ...c, match, startTime } : c
+    ));
+    
+    // Restore pool players to their previous state
+    setPoolPlayers(prev => {
+      // Remove players who were added back when match ended
+      let updated = prev.filter(p => !matchPlayerIds.includes(p.id));
+      
+      // Add back the previous state of players who were in pool before
+      previousPoolPlayers.forEach(prevPlayer => {
+        updated.push(prevPlayer);
+      });
+      
+      return updated;
+    });
+    
+    // Restore removed while on court tracking
+    if (removedWhileOnCourtPlayers && removedWhileOnCourtPlayers.length > 0) {
+      setRemovedWhileOnCourt(prev => {
+        const newSet = new Set(prev);
+        removedWhileOnCourtPlayers.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    }
+    
+    // Clear the undo state
+    setLastEndedMatch(null);
   };
 
   const returnMatchToQueue = (courtId) => {
@@ -1948,6 +2305,7 @@ function App() {
               selectedMatchId={selectedMatchId}
               clearIdleTimes={clearIdleTimes}
               onDropPlayerToPool={removePlayerFromMatch}
+              onDropPlayerToNotPresent={movePlayerFromMatchToNotPresent}
               isDarkMode={isDarkMode}
             />
           </div>
@@ -1988,6 +2346,10 @@ function App() {
               swapMatchPlayers={swapMatchPlayers}
               returnedMatches={returnedMatches}
               highlightedPriorityMatches={highlightedPriorityMatches}
+              poolPlayers={poolPlayers}
+              matchReservations={matchReservations}
+              reservePlayerInMatch={reservePlayerInMatch}
+              clearReservation={clearReservation}
             />
           </div>
 
@@ -2008,6 +2370,8 @@ function App() {
               returnMatchToQueue={returnMatchToQueue}
               currentTime={currentTime}
               isDarkMode={isDarkMode}
+              lastEndedMatch={lastEndedMatch}
+              undoEndMatch={undoEndMatch}
             />
           </div>
         </div>

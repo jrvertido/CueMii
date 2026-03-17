@@ -1,7 +1,7 @@
 // App Version
-export const APP_VERSION = '3.3.12';
+export const APP_VERSION = '4.0.5';
 
-// Initial player database from baddixx_players.csv
+// Initial player database from baddixx_players_20260211.csv
 export const initialPlayers = [
   { id: 1767384001001, name: "Joseph Vertido", gender: "male", level: "Intermediate" },
   { id: 1767384001002, name: "Xian Esmundo", gender: "male", level: "Intermediate" },
@@ -140,6 +140,18 @@ export const initialPlayers = [
   { id: 1767384001135, name: "Devien Yogiana", gender: "male", level: "Expert" },
   { id: 1767384001136, name: "Jessette Villavelez", gender: "female", level: "Intermediate" },
   { id: 1767384001137, name: "Raina Pepito", gender: "female", level: "Expert" },
+  { id: 1767384001138, name: "Drix Banzuela", gender: "male", level: "Intermediate" },
+  { id: 1767384001139, name: "Jason Yu", gender: "male", level: "Novice" },
+  { id: 1767384001140, name: "Jet Santos", gender: "male", level: "Expert" },
+  { id: 1767384001141, name: "Jia Chen", gender: "female", level: "Advanced" },
+  { id: 1767384001142, name: "Kay Joson", gender: "female", level: "Novice" },
+  { id: 1767384001143, name: "Mark Bal", gender: "male", level: "Novice" },
+  { id: 1767384001144, name: "Carmelo Arada", gender: "male", level: "Expert" },
+  { id: 1767384001145, name: "Renz", gender: "male", level: "Intermediate" },
+  { id: 1767384001146, name: "Salah", gender: "male", level: "Advanced" },
+  { id: 1767384001147, name: "Sazid Chowdhury", gender: "male", level: "Advanced" },
+  { id: 1767384001148, name: "Renz Cruz", gender: "male", level: "Advanced" },
+  { id: 1767384001149, name: "Mark Abellon", gender: "male", level: "Intermediate" },
 ];
 
 // Initial courts

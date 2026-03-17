@@ -26,9 +26,9 @@ const SettingsModal = ({
 
   const handleReset = () => {
     const defaults = {
-      noviceOverMatchThreshold: 2,
-      noviceToNoviceThreshold: 3,
-      repeatPairingsThreshold: 3
+      noviceOverMatchThreshold: 4,
+      noviceToNoviceThreshold: 8,
+      repeatPairingsThreshold: 4
     };
     setLocalSettings(defaults);
   };
@@ -114,7 +114,7 @@ const SettingsModal = ({
                 } border focus:ring-2 focus:ring-pink-500 focus:border-transparent`}
               />
               <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                times (default: 2)
+                times (default: 4)
               </span>
             </div>
           </div>
@@ -141,7 +141,7 @@ const SettingsModal = ({
                 } border focus:ring-2 focus:ring-pink-500 focus:border-transparent`}
               />
               <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                times (default: 3)
+                times (default: 8)
               </span>
             </div>
           </div>
@@ -168,7 +168,7 @@ const SettingsModal = ({
                 } border focus:ring-2 focus:ring-pink-500 focus:border-transparent`}
               />
               <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                times (default: 3)
+                times (default: 4)
               </span>
             </div>
           </div>

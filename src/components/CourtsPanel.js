@@ -18,7 +18,9 @@ const CourtsPanel = ({
   endMatch,
   returnMatchToQueue,
   currentTime,
-  isDarkMode = true
+  isDarkMode = true,
+  lastEndedMatch,
+  undoEndMatch
 }) => {
   // Format name as "FirstName L."
   const formatName = (name) => {
@@ -262,10 +264,27 @@ const CourtsPanel = ({
                     ))}
                   </div>
                   
-                  {/* Placeholder for buttons area - same height */}
-                  <div className="flex items-center justify-center text-slate-500 text-xs h-6">
-                    Available
-                  </div>
+                  {/* Show Undo button if this court just had a match ended, otherwise show Available */}
+                  {lastEndedMatch?.courtId === court.id ? (
+                    <button
+                      onClick={undoEndMatch}
+                      className={`w-full h-6 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                        isDarkMode 
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white' 
+                          : 'bg-amber-500 hover:bg-amber-400 text-white'
+                      }`}
+                      title="Undo - Put players back on court"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                      Undo
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-center text-slate-500 text-xs h-6">
+                      Available
+                    </div>
+                  )}
                 </div>
               )}
             </div>

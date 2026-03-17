@@ -26,6 +26,7 @@ const PlayerDatabaseModal = ({
   const [newPlayer, setNewPlayer] = useState({ name: '', gender: 'male', level: 'Intermediate' });
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [letterFilter, setLetterFilter] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -33,6 +34,7 @@ const PlayerDatabaseModal = ({
   const [newlyAddedPlayerIds, setNewlyAddedPlayerIds] = useState([]);
   
   const playerListRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // License limits
   const maxPlayers = licenseInfo?.maxPlayers || Infinity;
@@ -143,7 +145,11 @@ const PlayerDatabaseModal = ({
   };
 
   const filteredPlayers = [...players]
-    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesLetter = !letterFilter || p.name.toUpperCase().startsWith(letterFilter);
+      return matchesSearch && matchesLetter;
+    })
     .sort((a, b) => {
       // Newly added players always appear at the top (in order they were added)
       const aIsNew = newlyAddedPlayerIds.includes(a.id);
@@ -175,6 +181,13 @@ const PlayerDatabaseModal = ({
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
+  // Convert string to Title Case
+  const toTitleCase = (str) => {
+    return str.toLowerCase().split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   const handleAddPlayer = () => {
     // Check license limit
     if (isAtLimit) {
@@ -192,9 +205,12 @@ const PlayerDatabaseModal = ({
       }
       
       const newId = Date.now();
-      onAddPlayer({ ...newPlayer, id: newId, name: newPlayer.name.trim() });
+      const titleCaseName = toTitleCase(newPlayer.name.trim());
+      onAddPlayer({ ...newPlayer, id: newId, name: titleCaseName });
       setNewlyAddedPlayerIds(prev => [newId, ...prev]);
       setNewPlayer({ name: '', gender: 'male', level: 'Intermediate' });
+      setSearchTerm(''); // Clear search bar after adding
+      setLetterFilter(''); // Reset letter filter to "All"
       // Scroll to top of player list after a brief delay to allow state update
       setTimeout(() => {
         if (playerListRef.current) {
@@ -354,16 +370,9 @@ const PlayerDatabaseModal = ({
           </div>
 
           {/* Add New Player Section - Compact */}
-          <div className="bg-slate-800/50 rounded-lg p-3 mb-4 border border-slate-700">
+          <div className="bg-gradient-to-r from-cyan-900/30 to-teal-900/30 rounded-lg p-3 mb-4 border border-cyan-700/50">
             <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={newPlayer.name}
-                onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                placeholder="New player name..."
-                className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
-                onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
-              />
+              <label className="text-cyan-400 text-sm font-semibold whitespace-nowrap">New</label>
               <select
                 value={newPlayer.gender}
                 onChange={(e) => setNewPlayer({ ...newPlayer, gender: e.target.value })}
@@ -381,6 +390,14 @@ const PlayerDatabaseModal = ({
                   <option key={level} value={level}>{level}</option>
                 ))}
               </select>
+              <input
+                type="text"
+                value={newPlayer.name}
+                onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
+                placeholder="Player name..."
+                className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
+              />
               <button
                 onClick={handleAddPlayer}
                 disabled={isAtLimit}
@@ -396,23 +413,79 @@ const PlayerDatabaseModal = ({
             </div>
           </div>
 
+          {/* Separator */}
+          <div className="border-t border-slate-600/50 my-4"></div>
+
           {/* Search */}
-          <div className="mb-4">
+          <div className="mb-2 flex items-center gap-3">
+            <label className="text-cyan-400 text-sm font-bold whitespace-nowrap">Search</label>
             <input
+              ref={searchInputRef}
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setLetterFilter(''); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && filteredPlayers.length === 1) {
+                  const player = filteredPlayers[0];
+                  if (!isInPool(player.id)) {
+                    onAddToPool(player);
+                    setNewlyAddedPlayerIds(prev => prev.filter(id => id !== player.id));
+                    setSearchTerm('');
+                  }
+                }
+              }}
               placeholder="Search players..."
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+              className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
             />
+          </div>
+
+          {/* A-Z Letter Filter */}
+          <div className="mb-4 flex gap-0.5">
+            <button
+              onClick={() => setLetterFilter('')}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                letterFilter === '' 
+                  ? 'bg-cyan-500 text-white' 
+                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => (
+              <button
+                key={letter}
+                onClick={() => { 
+                  if (letterFilter === letter) {
+                    setLetterFilter('');
+                  } else {
+                    setLetterFilter(letter); 
+                    setSearchTerm(''); 
+                  }
+                }}
+                className={`w-6 py-1 text-xs font-medium rounded transition-colors ${
+                  letterFilter === letter 
+                    ? 'bg-cyan-500 text-white' 
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                }`}
+              >
+                {letter}
+              </button>
+            ))}
           </div>
 
           {/* Player List */}
           <div ref={playerListRef} className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col className="w-[30%]" />
+                <col className="w-[12%]" />
+                <col className="w-[15%]" />
+                <col className="w-[13%]" />
+                <col className="w-[30%]" />
+              </colgroup>
               <thead className="sticky top-0 bg-slate-800">
                 <tr className="text-left text-slate-400 text-sm uppercase tracking-wider">
-                  <th className="pb-3 px-2">
+                  <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('name')}
                       className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
@@ -420,7 +493,7 @@ const PlayerDatabaseModal = ({
                       Name <SortIcon field="name" />
                     </button>
                   </th>
-                  <th className="pb-3 px-2">
+                  <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('gender')}
                       className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
@@ -428,7 +501,7 @@ const PlayerDatabaseModal = ({
                       Gender <SortIcon field="gender" />
                     </button>
                   </th>
-                  <th className="pb-3 px-2">
+                  <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('level')}
                       className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
@@ -436,8 +509,8 @@ const PlayerDatabaseModal = ({
                       Level <SortIcon field="level" />
                     </button>
                   </th>
-                  <th className="pb-3 px-2">Status</th>
-                  <th className="pb-3 px-2 text-right">Actions</th>
+                  <th className="py-3 px-2 align-middle">Status</th>
+                  <th className="py-3 px-2 align-middle text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -459,14 +532,14 @@ const PlayerDatabaseModal = ({
                             type="text"
                             value={editingPlayer.name}
                             onChange={(e) => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
-                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white w-full"
+                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white w-full max-w-full"
                           />
                         </td>
                         <td className="py-3 px-2">
                           <select
                             value={editingPlayer.gender}
                             onChange={(e) => setEditingPlayer({ ...editingPlayer, gender: e.target.value })}
-                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white"
+                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white w-full"
                           >
                             <option value="male">Male</option>
                             <option value="female">Female</option>
@@ -476,7 +549,7 @@ const PlayerDatabaseModal = ({
                           <select
                             value={editingPlayer.level}
                             onChange={(e) => setEditingPlayer({ ...editingPlayer, level: e.target.value })}
-                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white"
+                            className="bg-slate-900 border border-cyan-500 rounded px-2 py-1 text-white w-full"
                           >
                             {SKILL_LEVELS.map(level => (
                               <option key={level} value={level}>{level}</option>
@@ -484,18 +557,18 @@ const PlayerDatabaseModal = ({
                           </select>
                         </td>
                         <td className="py-3 px-2">
-                          <span className={`text-xs px-2 py-1 rounded-full ${isInPool(player.id) ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/50 text-slate-400'}`}>
+                          <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${isInPool(player.id) ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/50 text-slate-400'}`}>
                             {isInPool(player.id) ? 'In Pool' : 'Not in Pool'}
                           </span>
                         </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-right whitespace-nowrap">
                           <button onClick={handleSaveEdit} className="text-green-400 hover:text-green-300 mr-2">Save</button>
                           <button onClick={() => setEditingPlayer(null)} className="text-slate-400 hover:text-slate-300">Cancel</button>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 truncate">
                           <span className={`font-medium ${player.gender === 'male' ? 'text-blue-300' : 'text-pink-300'}`}>{player.name}</span>
                         </td>
                         <td className="py-3 px-2">
@@ -516,14 +589,19 @@ const PlayerDatabaseModal = ({
                         <td className="py-3 px-2 text-right space-x-2">
                           {!isInPool(player.id) ? (
                             <button
-                              onClick={() => onAddToPool(player)}
+                              onClick={() => { 
+                                onAddToPool(player); 
+                                setNewlyAddedPlayerIds(prev => prev.filter(id => id !== player.id));
+                                setSearchTerm(''); 
+                                searchInputRef.current?.focus(); 
+                              }}
                               className="bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-400 hover:text-cyan-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-cyan-500/30 transition-all"
                             >
                               + Add to Pool
                             </button>
                           ) : (
                             <button
-                              onClick={() => onRemoveFromPool(player.id)}
+                              onClick={() => { onRemoveFromPool(player.id); setSearchTerm(''); searchInputRef.current?.focus(); }}
                               className="bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 hover:text-orange-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-orange-500/30 transition-all"
                             >
                               − Remove

@@ -103,6 +103,8 @@ const PlayerPool = ({
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
       if (data.sourceType === 'pool' && data.player) {
         moveToNotPresent(data.player.id);
+      } else if (data.sourceType === 'match' && data.sourceMatchId && data.player) {
+        onDropPlayerToNotPresent(data.sourceMatchId, data.player.id);
       }
     } catch (err) {
       console.error('Drop error:', err);
@@ -167,26 +169,31 @@ const PlayerPool = ({
     </div>
   );
 
-  // Not Present player card - simpler, no timer/count
+  // Not Present player card - simpler, single line
   const NotPresentCard = ({ player }) => (
     <div
       draggable={true}
       onDragStart={(e) => handleDragStart(e, player, 'notPresent')}
-      className={`group rounded-lg p-2 border transition-all cursor-grab active:cursor-grabbing ${
+      className={`group rounded-lg px-2 py-1.5 border transition-all cursor-grab active:cursor-grabbing ${
         isDarkMode 
           ? 'bg-slate-800/30 border-red-500/30 hover:border-red-500/50' 
           : 'bg-red-50/30 border-red-300/50 hover:border-red-400 shadow-sm'
       }`}
     >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <GenderIcon gender={player.gender} />
-          <span className={`font-medium text-sm truncate ${
-            player.gender === 'male' 
-              ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') 
-              : (isDarkMode ? 'text-pink-400' : 'text-pink-700')
-          }`}>{player.name}</span>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`font-medium text-sm truncate flex-1 ${
+          isDarkMode ? 'text-slate-200' : 'text-slate-700'
+        }`}>{player.name}</span>
+        <button
+          onClick={() => moveToAvailable(player.id)}
+          className={`text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
+            isDarkMode 
+              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400' 
+              : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300'
+          }`}
+        >
+          Check-In
+        </button>
         <button
           onClick={() => removeFromPool(player.id)}
           className={`p-0.5 rounded transition-all flex-shrink-0 ${
@@ -201,21 +208,20 @@ const PlayerPool = ({
           </svg>
         </button>
       </div>
-      <div className="flex items-center justify-between gap-1">
-        <LevelBadge level={player.level} isDarkMode={isDarkMode} />
-        <button
-          onClick={() => moveToAvailable(player.id)}
-          className={`text-xs px-2 py-0.5 rounded transition-colors ${
-            isDarkMode 
-              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400' 
-              : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300'
-          }`}
-        >
-          ✓ Check-In
-        </button>
-      </div>
     </div>
   );
+
+  // Group not present players by first letter
+  const groupedNotPresent = filteredNotPresent.reduce((groups, player) => {
+    const firstLetter = player.name.charAt(0).toUpperCase();
+    if (!groups[firstLetter]) {
+      groups[firstLetter] = [];
+    }
+    groups[firstLetter].push(player);
+    return groups;
+  }, {});
+  
+  const sortedLetters = Object.keys(groupedNotPresent).sort();
 
   const totalPlayers = poolPlayers.length + notPresentPlayers.length;
 
@@ -274,13 +280,30 @@ const PlayerPool = ({
               type="text"
               value={poolSearch}
               onChange={(e) => setPoolSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && filteredNotPresent.length === 1) {
+                  moveToAvailable(filteredNotPresent[0].id);
+                  setPoolSearch('');
+                }
+              }}
               placeholder="Search..."
-              className={`w-full border rounded pl-7 pr-2 py-1 text-sm focus:outline-none transition-colors ${
+              className={`w-full border rounded pl-7 pr-7 py-1 text-sm focus:outline-none transition-colors ${
                 isDarkMode 
                   ? 'bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500' 
                   : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-cyan-400'
               }`}
             />
+            {poolSearch && (
+              <button
+                onClick={() => setPoolSearch('')}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           <select
             value={poolLevelFilter}
@@ -372,9 +395,20 @@ const PlayerPool = ({
                   No players waiting to arrive
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {filteredNotPresent.map(player => (
-                    <NotPresentCard key={player.id} player={player} />
+                <div className="flex flex-col gap-2">
+                  {sortedLetters.map(letter => (
+                    <div key={letter}>
+                      <div className={`text-xs font-bold px-1 py-0.5 mb-1 ${
+                        isDarkMode ? 'text-slate-500' : 'text-slate-400'
+                      }`}>
+                        {letter}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {groupedNotPresent[letter].map(player => (
+                          <NotPresentCard key={player.id} player={player} />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

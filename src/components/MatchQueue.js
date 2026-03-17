@@ -34,12 +34,19 @@ const MatchQueue = ({
   clearAllMatches,
   swapMatchPlayers,
   returnedMatches = {},
-  highlightedPriorityMatches = {}
+  highlightedPriorityMatches = {},
+  poolPlayers = [],
+  matchReservations = {},
+  reservePlayerInMatch,
+  clearReservation
 }) => {
   const [dragOverMatchId, setDragOverMatchId] = useState(null);
   const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [reservationDropdown, setReservationDropdown] = useState(null); // { matchId, slotIndex }
+  const [reservationSearch, setReservationSearch] = useState('');
   const dropdownRef = useRef(null);
+  const reservationDropdownRef = useRef(null);
   const matchRefs = useRef({});
   const scrollContainerRef = useRef(null);
   const matchListRef = useRef(null);
@@ -104,6 +111,18 @@ const MatchQueue = ({
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setOpenCourtDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close reservation dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (reservationDropdownRef.current && !reservationDropdownRef.current.contains(event.target)) {
+        setReservationDropdown(null);
+        setReservationSearch('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -313,6 +332,18 @@ const MatchQueue = ({
               const isFirstMatch = matchIndex === 0;
               const isLastMatch = matchIndex === sortedMatches.length - 1;
               
+              // Calculate average wait time for players in this match
+              // Look up each player's joinedAt from poolPlayers
+              const playerWaitTimes = match.players.map(p => {
+                const poolPlayer = poolPlayers.find(pp => pp.id === p.id);
+                return poolPlayer?.joinedAt || p.joinedAt;
+              }).filter(Boolean);
+              
+              const avgWaitTimeMs = playerWaitTimes.length > 0
+                ? playerWaitTimes.reduce((sum, joinedAt) => sum + (Date.now() - joinedAt), 0) / playerWaitTimes.length
+                : 0;
+              const avgWaitTimeMinutes = Math.round(avgWaitTimeMs / 60000);
+              
               // Check if match was recently returned from court (within 30 seconds)
               const returnedTime = returnedMatches[match.id];
               const isRecentlyReturned = returnedTime && (Date.now() - returnedTime) < 30000;
@@ -397,6 +428,20 @@ const MatchQueue = ({
                       }`}>
                         #{match.matchNumber || '?'}
                       </span>
+                      <button
+                        onClick={() => setSelectedMatchId(selectedMatchId === match.id ? null : match.id)}
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                          selectedMatchId === match.id
+                            ? isComplete 
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-orange-500 text-white'
+                            : isDarkMode 
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                              : 'bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300'
+                        }`}
+                      >
+                        {selectedMatchId === match.id ? 'Selected' : 'Select'}
+                      </button>
                       {/* Preferred Courts Multi-Select Dropdown */}
                       <div className="relative" ref={openCourtDropdown === match.id ? dropdownRef : null}>
                         <button
@@ -450,20 +495,20 @@ const MatchQueue = ({
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => setSelectedMatchId(selectedMatchId === match.id ? null : match.id)}
-                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                          selectedMatchId === match.id
-                            ? isComplete 
-                              ? 'bg-emerald-500 text-white'
-                              : 'bg-orange-500 text-white'
-                            : isDarkMode 
-                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
-                              : 'bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300'
-                        }`}
-                      >
-                        {selectedMatchId === match.id ? 'Selected' : 'Select'}
-                      </button>
+                      {/* Average Wait Time */}
+                      {match.players.length > 0 && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          avgWaitTimeMinutes >= 40
+                            ? (isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600')
+                            : avgWaitTimeMinutes >= 30
+                              ? (isDarkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600')
+                              : avgWaitTimeMinutes >= 20
+                                ? (isDarkMode ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-600')
+                                : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-600')
+                        }`} title="Average wait time for players in this match">
+                          ⏱ {avgWaitTimeMinutes}m
+                        </span>
+                      )}
                       <span className={`text-xs font-medium ${
                         isComplete 
                           ? (isDarkMode ? 'text-emerald-400' : 'text-emerald-600') 
@@ -538,7 +583,7 @@ const MatchQueue = ({
                           Undo
                         </button>
                       )}
-                      {match.players.length > 0 && (
+                      {(match.players.length > 0 || (matchReservations[match.id] && Object.keys(matchReservations[match.id]).length > 0)) && (
                         <button
                           onClick={() => clearMatch(match.id)}
                           className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
@@ -546,7 +591,7 @@ const MatchQueue = ({
                               ? 'bg-slate-600 hover:bg-slate-500 text-slate-200' 
                               : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                           }`}
-                          title="Clear all players from match"
+                          title="Clear all players and reservations from match"
                         >
                           Clear
                         </button>
@@ -642,7 +687,123 @@ const MatchQueue = ({
                               </div>
                             </div>
                           ) : (
-                            <div className={`text-base text-center ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>—</div>
+                            (() => {
+                              const reservation = matchReservations[match.id]?.[index];
+                              const isDropdownOpen = reservationDropdown?.matchId === match.id && reservationDropdown?.slotIndex === index;
+                              
+                              // Get all player IDs that are already reserved in any match
+                              const allReservedPlayerIds = new Set();
+                              Object.values(matchReservations).forEach(matchRes => {
+                                Object.values(matchRes).forEach(player => {
+                                  if (player?.id) allReservedPlayerIds.add(player.id);
+                                });
+                              });
+                              
+                              // Get available players for reservation (in pool, not in this match, not reserved elsewhere)
+                              const availableForReservation = poolPlayers
+                                .filter(p => !match.players.some(mp => mp.id === p.id))
+                                .filter(p => !allReservedPlayerIds.has(p.id))
+                                .filter(p => p.name.toLowerCase().includes(reservationSearch.toLowerCase()))
+                                .sort((a, b) => a.name.localeCompare(b.name));
+                              
+                              return reservation ? (
+                                // Show reserved player
+                                <div className="group flex items-center justify-between gap-1">
+                                  <div className={`flex-1 truncate text-xs ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                                    <span className="opacity-70">Waiting for:</span>{' '}
+                                    <span className="font-medium">{(() => {
+                                      const parts = reservation.name.split(' ');
+                                      if (parts.length > 1) {
+                                        return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+                                      }
+                                      return parts[0];
+                                    })()}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => clearReservation(match.id, index)}
+                                    className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                      isDarkMode 
+                                        ? 'text-red-400 hover:text-red-300 hover:bg-red-500/20' 
+                                        : 'text-red-500 hover:text-red-600 hover:bg-red-100'
+                                    }`}
+                                    title="Clear reservation"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ) : (
+                                // Empty slot - clickable to reserve
+                                <div className="relative">
+                                  <button
+                                    onClick={() => {
+                                      setReservationDropdown({ matchId: match.id, slotIndex: index });
+                                      setReservationSearch('');
+                                    }}
+                                    className={`w-full text-base text-center cursor-pointer hover:opacity-100 transition-opacity ${
+                                      isDarkMode ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                                    title="Click to reserve a player"
+                                  >
+                                    —
+                                  </button>
+                                  
+                                  {/* Reservation dropdown */}
+                                  {isDropdownOpen && (
+                                    <div 
+                                      ref={reservationDropdownRef}
+                                      className={`absolute z-50 top-full left-0 mt-1 w-48 rounded-lg shadow-xl border ${
+                                        isDarkMode 
+                                          ? 'bg-slate-800 border-slate-600' 
+                                          : 'bg-white border-slate-200'
+                                      }`}
+                                    >
+                                      <div className="p-2">
+                                        <input
+                                          type="text"
+                                          value={reservationSearch}
+                                          onChange={(e) => setReservationSearch(e.target.value)}
+                                          placeholder="Search player..."
+                                          autoFocus
+                                          className={`w-full px-2 py-1 text-sm rounded border ${
+                                            isDarkMode 
+                                              ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                                              : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                          }`}
+                                        />
+                                      </div>
+                                      <div className="max-h-40 overflow-y-auto">
+                                        {availableForReservation.length === 0 ? (
+                                          <div className={`px-3 py-2 text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            No players found
+                                          </div>
+                                        ) : (
+                                          availableForReservation.slice(0, 10).map(player => (
+                                            <button
+                                              key={player.id}
+                                              onClick={() => {
+                                                reservePlayerInMatch(match.id, index, player);
+                                                setReservationDropdown(null);
+                                                setReservationSearch('');
+                                              }}
+                                              className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${
+                                                isDarkMode 
+                                                  ? 'hover:bg-slate-700 text-slate-200' 
+                                                  : 'hover:bg-slate-100 text-slate-700'
+                                              }`}
+                                            >
+                                              <span className={player.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}>●</span>
+                                              <span className="truncate">{player.name}</span>
+                                            </button>
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()
                           )}
                         </div>
                       );
